@@ -104,12 +104,16 @@ export function GitPanel({ contentPath, onSelectFile }: GitPanelProps) {
 
         <div className="px-4">
           <Button
-            onClick={handlePush}
-            disabled={isPushing}
+            onClick={status.length > 0 ? handleCommit : handlePush}
+            disabled={(status.length > 0 && !message.trim()) || (status.length > 0 ? isCommitting : isPushing)}
             className="w-full h-[32px] bg-white/5 hover:bg-white/10 text-white text-[13px] font-semibold rounded-md transition-all flex items-center justify-center gap-2 border border-white/10"
           >
-            <span className="material-symbols-outlined text-[16px]">{isPushing ? "sync" : "cloud_upload"}</span>
-            Publish Branch
+            <span className="material-symbols-outlined text-[16px]">
+              {status.length > 0 
+                ? (isCommitting ? "sync" : "check") 
+                : (isPushing ? "sync" : "cloud_upload")}
+            </span>
+            {status.length > 0 ? "Commit" : "Publish"}
           </Button>
         </div>
       </div>
