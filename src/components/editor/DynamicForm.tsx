@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useForm, Controller, FormProvider, useFormContext, useWatch } from "react-hook-form";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ActionFooter } from "../layout/ActionFooter";
@@ -10,6 +10,33 @@ import { SlidingNumber } from "@/components/animate-ui/primitives/texts/sliding-
 function capitalize(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
+
+const AutoResizeTextarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>((props, ref) => {
+  const localRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (localRef.current) {
+      localRef.current.style.height = "auto";
+      // We add a little extra to account for borders or padding weirdness, scrollHeight handles the inner height.
+      localRef.current.style.height = `${localRef.current.scrollHeight}px`;
+    }
+  }, [props.value]);
+
+  return (
+    <textarea
+      {...props}
+      ref={(el) => {
+        // @ts-ignore
+        localRef.current = el;
+        if (typeof ref === 'function') ref(el);
+        else if (ref) (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+      }}
+      rows={1}
+      style={{ overflow: "hidden", ...props.style }}
+      className={`resize-none ${props.className || ''}`}
+    />
+  );
+});
 
 interface DynamicFormProps {
   initialData: any;
@@ -74,7 +101,7 @@ function RecursiveField({
           control={control}
           render={({ field }) =>
             isPath ? (
-              <div className="flex gap-2 w-full md:max-w-2xl">
+              <div className="flex gap-2 w-full md:max-w-xl">
                   <Input
                     {...field}
                     type="text"
@@ -98,9 +125,9 @@ function RecursiveField({
                 </button>
               </div>
             ) : isMultiline ? (
-              <textarea
+              <AutoResizeTextarea
                 {...field}
-                className={`bg-transparent border rounded-md p-3 text-[13px] text-white focus:outline-none transition-all min-h-[100px] w-full backdrop-blur-sm ${
+                className={`bg-transparent border rounded-md px-3 py-2 text-[13px] text-white focus:outline-none transition-all min-h-[36px] w-full md:max-w-xl backdrop-blur-sm ${
                   isDirty 
                     ? "border-primary hover:border-primary/80 focus:border-primary" 
                     : "border-white/10 hover:border-white/20 focus:border-white/40"
