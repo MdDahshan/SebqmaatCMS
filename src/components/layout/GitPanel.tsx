@@ -211,9 +211,12 @@ export function GitPanel({ contentPath, onSelectFile }: GitPanelProps) {
   const isBusy = isCommitting || isPushing || isPulling;
 
   let primaryAction = 'commit';
-  if (!hasStaged) {
-    if (canPublish) primaryAction = 'publish';
-    else if (branchStatus.behind > 0) primaryAction = 'sync';
+  if (hasStaged || hasUnstaged) {
+    primaryAction = 'commit';
+  } else if (canPublish && branchStatus.behind === 0) {
+    primaryAction = 'publish';
+  } else if (canPublish || branchStatus.behind > 0) {
+    primaryAction = 'sync';
   }
 
   const renderFileList = (files: GitStatusItem[], isStaged: boolean) => {
@@ -325,15 +328,34 @@ export function GitPanel({ contentPath, onSelectFile }: GitPanelProps) {
                   Commit
                 </>
               ) : primaryAction === 'publish' ? (
-                <>
-                  <span className="material-symbols-outlined text-[14px]">cloud_upload</span>
-                  Publish {branchStatus.ahead > 0 ? branchStatus.ahead : ''}
-                </>
+                <div className="relative flex items-center justify-center w-full h-full">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]">cloud_upload</span>
+                    <span>Publish Branch</span>
+                  </div>
+                  {branchStatus.ahead > 0 && (
+                    <div className="absolute right-2 flex items-center">
+                      <span className="bg-[#e5e5e5] text-black h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center shadow-sm">
+                        {branchStatus.ahead}
+                      </span>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <>
-                  <span className="material-symbols-outlined text-[14px]">sync</span>
-                  Sync
-                </>
+                <div className="relative flex items-center justify-center w-full h-full">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]">sync</span>
+                    <span>Sync Changes</span>
+                  </div>
+                  {(branchStatus.ahead > 0 || branchStatus.behind > 0) && (
+                    <div className="absolute right-2 flex items-center">
+                      <span className="bg-[#e5e5e5] text-black h-4 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center shadow-sm gap-0.5">
+                        {branchStatus.behind > 0 && <span>{branchStatus.behind}↓</span>}
+                        {branchStatus.ahead > 0 && <span>{branchStatus.ahead}↑</span>}
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
             </Button>
             
