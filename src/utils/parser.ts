@@ -38,7 +38,7 @@ export function parseFileContent(content: string, filePath: string) {
 
 export function stringifyFileContent(data: any, filePath: string) {
   if (filePath.endsWith(".json")) {
-    return JSON.stringify(data, null, 2);
+    return JSON.stringify(data, null, 2) + "\n";
   }
 
   if (filePath.endsWith(".md") || filePath.endsWith(".mdx")) {

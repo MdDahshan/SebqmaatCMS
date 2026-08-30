@@ -66,6 +66,7 @@ function applyRevert(obj: any, path: string[], oldValue: any): any {
 
 export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: GitDiffEditorProps) {
   const [oldData, setOldData] = useState<any>(null);
+  const [rawGitDiff, setRawGitDiff] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,10 +82,18 @@ export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: G
         
         const oldContent = await invoke<string>("git_show_file", { path: contentPath, file: relativePath });
         setOldData(parseFileContent(oldContent, activePath));
+        
+        try {
+          const rawDiff = await invoke<string>("git_diff_file", { path: contentPath, file: relativePath });
+          setRawGitDiff(rawDiff);
+        } catch (e) {
+          console.error("Failed to load raw diff", e);
+        }
       } catch (e: any) {
         // If file is new/untracked, git show might fail
         setError(e.toString());
         setOldData(null);
+        setRawGitDiff(null);
       } finally {
         setIsLoading(false);
       }
@@ -100,7 +109,43 @@ export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: G
   const diffs = getDiff(oldData, fileData);
 
   if (diffs.length === 0) {
-    return <div className="p-8 text-center text-white/50">No changes found.</div>;
+    return (
+      <div className="w-full pb-12">
+        <div className="flex flex-col border border-white/10 rounded-xl bg-[#121212] shadow-lg overflow-hidden">
+          <details className="group">
+            <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-white/[0.02] transition-colors outline-none">
+              <span className="material-symbols-outlined text-[14px] text-text-muted group-open:rotate-90 transition-transform duration-200">chevron_right</span>
+              <span className="text-[13px] font-medium text-white/80">External or Formatting Changes</span>
+            </summary>
+            <div className="px-10 py-4 bg-[#161616] border-t border-white/5 text-[13px] text-white/60 leading-relaxed flex flex-col items-start gap-4">
+              <p>This file was modified outside of the CMS (or its text formatting has changed). The actual data content remains identical.</p>
+              {rawGitDiff && (
+                <div className="w-full mt-2 rounded-md bg-[#1e1e1e] border border-white/5 overflow-hidden">
+                  <div className="bg-black/40 px-4 py-2 border-b border-white/5 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[14px] text-white/40">code</span>
+                    <span className="text-[11px] font-medium text-white/60 uppercase tracking-wider">Raw Git Diff</span>
+                  </div>
+                  <pre className="p-4 text-[12px] font-mono leading-relaxed overflow-x-auto text-white/70 whitespace-pre-wrap break-all">
+                    {rawGitDiff.split('\n').map((line, i) => (
+                      <div 
+                        key={i} 
+                        className={`
+                          ${line.startsWith('+') ? 'text-green-400 bg-green-500/5' : ''}
+                          ${line.startsWith('-') ? 'text-red-400 bg-red-500/5' : ''}
+                          ${line.startsWith('@') ? 'text-blue-400 opacity-70' : ''}
+                        `}
+                      >
+                        {line}
+                      </div>
+                    ))}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </details>
+        </div>
+      </div>
+    );
   }
 
   const handleRevert = (diff: DiffChange) => {

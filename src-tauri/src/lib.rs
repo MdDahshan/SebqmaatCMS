@@ -253,6 +253,22 @@ fn git_show_file(path: &str, file: &str) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+#[tauri::command]
+fn git_diff_file(path: &str, file: &str) -> Result<String, String> {
+    let normalized_file = file.replace("\\", "/");
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(["diff", "HEAD", "--", &normalized_file])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -270,7 +286,8 @@ pub fn run() {
             git_add,
             git_commit,
             git_push,
-            git_show_file
+            git_show_file,
+            git_diff_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
