@@ -127,8 +127,21 @@ pub struct GitCommitLog {
     pub refs: String,
 }
 
+#[derive(Serialize)]
+pub struct GitChangesStatus {
+    pub staged: Vec<GitStatusItem>,
+    pub unstaged: Vec<GitStatusItem>,
+    pub untracked: Vec<GitStatusItem>,
+}
+
+#[derive(Serialize)]
+pub struct GitBranchStatus {
+    pub ahead: u32,
+    pub behind: u32,
+}
+
 #[tauri::command]
-fn get_git_status(path: &str) -> Result<Vec<GitStatusItem>, String> {
+fn get_git_status(path: &str) -> Result<GitChangesStatus, String> {
     let output = Command::new("git")
         .current_dir(path)
         .args(["status", "-s"])
@@ -140,17 +153,53 @@ fn get_git_status(path: &str) -> Result<Vec<GitStatusItem>, String> {
     }
 
     let status_str = String::from_utf8_lossy(&output.stdout);
-    let mut items = Vec::new();
+    let mut staged = Vec::new();
+    let mut unstaged = Vec::new();
+    let mut untracked = Vec::new();
 
     for line in status_str.lines() {
         if line.len() > 3 {
+            let x = line.chars().nth(0).unwrap_or(' ');
+            let y = line.chars().nth(1).unwrap_or(' ');
             let status = line[0..2].to_string();
             let file = line[3..].to_string();
-            items.push(GitStatusItem { file, status });
+
+            if x == '?' && y == '?' {
+                untracked.push(GitStatusItem { file: file.clone(), status: status.clone() });
+            } else {
+                if x != ' ' && x != '?' {
+                    staged.push(GitStatusItem { file: file.clone(), status: status.clone() });
+                }
+                if y != ' ' && y != '?' {
+                    unstaged.push(GitStatusItem { file, status });
+                }
+            }
         }
     }
 
-    Ok(items)
+    Ok(GitChangesStatus { staged, unstaged, untracked })
+}
+
+#[tauri::command]
+fn get_git_branch_status(path: &str) -> Result<GitBranchStatus, String> {
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(["rev-list", "--left-right", "--count", "HEAD...@{u}"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        // If there's no upstream branch set, it will fail. Return 0.
+        return Ok(GitBranchStatus { ahead: 0, behind: 0 });
+    }
+
+    let status_str = String::from_utf8_lossy(&output.stdout);
+    let parts: Vec<&str> = status_str.trim().split_whitespace().collect();
+    
+    let ahead = parts.get(0).unwrap_or(&"0").parse().unwrap_or(0);
+    let behind = parts.get(1).unwrap_or(&"0").parse().unwrap_or(0);
+
+    Ok(GitBranchStatus { ahead, behind })
 }
 
 #[tauri::command]
@@ -188,25 +237,39 @@ fn get_git_log(path: &str) -> Result<Vec<GitCommitLog>, String> {
 fn git_add(path: &str, files: Vec<&str>) -> Result<(), String> {
     let mut cmd = Command::new("git");
     cmd.current_dir(path).arg("add");
-    
-    for f in files {
-        cmd.arg(f);
+    for file in files {
+        cmd.arg(file);
     }
-    
     let output = cmd.output().map_err(|e| e.to_string())?;
-    
+
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
     }
-    
+
     Ok(())
 }
 
 #[tauri::command]
-fn git_commit(path: &str, message: &str) -> Result<(), String> {
+fn git_unstage(path: &str, files: Vec<&str>) -> Result<(), String> {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(path).args(["reset", "HEAD", "--"]);
+    for file in files {
+        cmd.arg(file);
+    }
+    let output = cmd.output().map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn git_commit(path: String, message: String) -> Result<(), String> {
     let output = Command::new("git")
         .current_dir(path)
-        .args(["commit", "-m", message])
+        .args(["commit", "-m", &message])
         .output()
         .map_err(|e| e.to_string())?;
 
@@ -218,10 +281,25 @@ fn git_commit(path: &str, message: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn git_push(path: &str) -> Result<(), String> {
+async fn git_push(path: String) -> Result<(), String> {
     let output = Command::new("git")
         .current_dir(path)
         .args(["push"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn git_pull(path: String) -> Result<(), String> {
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(["pull"])
         .output()
         .map_err(|e| e.to_string())?;
 
@@ -282,10 +360,13 @@ pub fn run() {
             upload_media,
             search_files,
             get_git_status,
+            get_git_branch_status,
             get_git_log,
             git_add,
+            git_unstage,
             git_commit,
             git_push,
+            git_pull,
             git_show_file,
             git_diff_file
         ])

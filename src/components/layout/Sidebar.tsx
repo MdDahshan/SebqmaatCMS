@@ -259,6 +259,7 @@ export function Sidebar({ contentPath, onSelectFile, selectedFilePath, onNewFile
                         >
                           <FileTreeItem
                             node={node}
+                            level={0}
                             onSelectFile={onSelectFile}
                             selectedFilePath={selectedFilePath}
                             drafts={drafts}

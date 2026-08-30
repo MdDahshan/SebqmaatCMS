@@ -298,7 +298,7 @@ export function DynamicForm({ initialData, draftData, activeTab, onSave, onDisca
   const methods = useForm({
     defaultValues: draftData || initialData,
   });
-  const { control, handleSubmit, reset, formState: { isDirty }, watch } = methods;
+  const { control, handleSubmit, reset, watch } = methods;
 
   const currentValues = watch();
 
