@@ -109,50 +109,52 @@ export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: G
   };
 
   return (
-    <div className="flex flex-col w-full pb-12">
-      {diffs.map((diff, i) => (
-        <div key={i} className="flex flex-col border-b border-white/5 py-3 group">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-1.5 px-2">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[14px] text-text-muted">difference</span>
-              <span className="text-[12px] font-medium text-white/80 font-code-sm">
-                {diff.path.join(" → ")}
-              </span>
+    <div className="w-full pb-12">
+      <div className="flex flex-col border border-white/10 rounded-xl bg-[#121212] shadow-lg overflow-hidden">
+        {diffs.map((diff, i) => (
+          <div key={i} className="flex flex-col border-b border-white/5 last:border-b-0 py-3 group even:bg-[#181818] odd:bg-[#121212]">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-1.5 px-4">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[14px] text-text-muted">difference</span>
+                <span className="text-[12px] font-medium text-white/80 font-code-sm">
+                  {diff.path.join(" → ")}
+                </span>
+              </div>
+              <Button 
+                onClick={() => handleRevert(diff)}
+                className="h-6 text-[10px] px-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all font-medium rounded-md opacity-0 group-hover:opacity-100"
+              >
+                <span className="material-symbols-outlined text-[12px] mr-1">undo</span>
+                Revert
+              </Button>
             </div>
-            <Button 
-              onClick={() => handleRevert(diff)}
-              className="h-6 text-[10px] px-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all font-medium rounded-md opacity-0 group-hover:opacity-100"
-            >
-              <span className="material-symbols-outlined text-[12px] mr-1">undo</span>
-              Revert
-            </Button>
-          </div>
-          
-          {/* Content */}
-          <div className="flex flex-col gap-0 font-code-sm text-[12.5px]">
-            {/* Old Value */}
-            {diff.oldValue !== undefined && (
-              <div className="flex items-start gap-4 py-1 px-2 hover:bg-white/[0.02] rounded-sm">
-                <div className="w-6 shrink-0 text-right text-error/50 select-none">-</div>
-                <div className="flex-1 text-error/80 whitespace-pre-wrap break-words line-through decoration-error/30">
-                  {typeof diff.oldValue === 'object' ? JSON.stringify(diff.oldValue, null, 2) : String(diff.oldValue)}
-                </div>
-              </div>
-            )}
             
-            {/* New Value */}
-            {diff.newValue !== undefined && (
-              <div className="flex items-start gap-4 py-1 px-2 hover:bg-white/[0.02] rounded-sm">
-                <div className="w-6 shrink-0 text-right text-[#34d399]/50 select-none">+</div>
-                <div className="flex-1 text-[#34d399]/90 whitespace-pre-wrap break-words">
-                  {typeof diff.newValue === 'object' ? JSON.stringify(diff.newValue, null, 2) : String(diff.newValue)}
+            {/* Content */}
+            <div className="flex flex-col gap-0 font-code-sm text-[12.5px] px-2">
+              {/* Old Value */}
+              {diff.oldValue !== undefined && (
+                <div className="flex items-start gap-4 py-1.5 px-2 hover:bg-white/[0.03] rounded-md transition-colors">
+                  <div className="w-6 shrink-0 text-right text-error/50 select-none">-</div>
+                  <div className="flex-1 text-error/80 whitespace-pre-wrap break-words line-through decoration-error/30">
+                    {typeof diff.oldValue === 'object' ? JSON.stringify(diff.oldValue, null, 2) : String(diff.oldValue)}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+              
+              {/* New Value */}
+              {diff.newValue !== undefined && (
+                <div className="flex items-start gap-4 py-1.5 px-2 hover:bg-white/[0.03] rounded-md transition-colors">
+                  <div className="w-6 shrink-0 text-right text-[#34d399]/50 select-none">+</div>
+                  <div className="flex-1 text-[#34d399]/90 whitespace-pre-wrap break-words">
+                    {typeof diff.newValue === 'object' ? JSON.stringify(diff.newValue, null, 2) : String(diff.newValue)}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
