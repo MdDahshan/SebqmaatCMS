@@ -1,16 +1,20 @@
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, FormProvider, useFormContext, useWatch } from "react-hook-form";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ActionFooter } from "../layout/ActionFooter";
+import { motion, AnimatePresence } from "framer-motion";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { SlidingNumber } from "@/components/animate-ui/primitives/texts/sliding-number";
+
+function capitalize(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
 interface DynamicFormProps {
   initialData: any;
   activeTab: string;
   onSave: (data: any) => void;
   onDiscard: () => void;
-}
-
-function capitalize(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function RecursiveField({
@@ -56,10 +60,10 @@ function RecursiveField({
           render={({ field }) =>
             isPath ? (
               <div className="flex gap-2 w-full md:max-w-2xl">
-                <input
+                <Input
                   {...field}
                   type="text"
-                  className="bg-transparent border border-white/10 rounded-md h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full backdrop-blur-sm"
+                  className="bg-transparent border-white/10 h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full backdrop-blur-sm"
                 />
                 <button
                   type="button"
@@ -80,10 +84,10 @@ function RecursiveField({
                 className="bg-transparent border border-white/10 rounded-md p-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all min-h-[100px] w-full backdrop-blur-sm"
               />
             ) : (
-              <input
+              <Input
                 {...field}
                 type="text"
-                className="bg-transparent border border-white/10 rounded-md h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm"
+                className="bg-transparent border-white/10 h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm"
               />
             )
           }
@@ -131,19 +135,17 @@ function RecursiveField({
   if (type === "number") {
     return (
       <div className="flex flex-col gap-2">
-        <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
+        <label className="text-[13px] font-medium text-text-primary">
           {fieldName}
-          <span className="text-[10px] font-normal text-text-muted">Number</span>
         </label>
         <Controller
           name={name}
           control={control}
           render={({ field }) => (
-            <input
-              type="number"
+            <Input
+              type="text"
               {...field}
-              onChange={(e) => field.onChange(Number(e.target.value))}
-              className="bg-transparent border border-white/10 rounded-md h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm"
+              className="bg-transparent border-white/10 h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm"
             />
           )}
         />
@@ -153,20 +155,56 @@ function RecursiveField({
 
   if (Array.isArray(value)) {
     const isTabContent = level === 0;
+    const { getValues, setValue } = useFormContext();
+    const arrayValue = useWatch({ control, name }) || value;
+    
+    const handleAddItem = () => {
+      const currentArray = getValues(name) || [];
+      let emptyItem: any = "";
+      const referenceItem = currentArray.length > 0 ? currentArray[0] : (value.length > 0 ? value[0] : null);
+      
+      if (referenceItem !== null) {
+        if (typeof referenceItem === 'object' && referenceItem !== null) {
+          emptyItem = {};
+          for (const k of Object.keys(referenceItem)) {
+            emptyItem[k] = typeof referenceItem[k] === 'number' ? 0 : typeof referenceItem[k] === 'boolean' ? false : "";
+          }
+        } else if (typeof referenceItem === 'number') {
+          emptyItem = 0;
+        } else if (typeof referenceItem === 'boolean') {
+          emptyItem = false;
+        }
+      }
+      
+      setValue(name, [...currentArray, emptyItem], { shouldDirty: true });
+    };
+
+    const handleRemoveItem = (indexToRemove: number) => {
+      const currentArray = getValues(name) || [];
+      setValue(name, currentArray.filter((_: any, i: number) => i !== indexToRemove), { shouldDirty: true });
+    };
+
     return (
       <div className={`flex flex-col w-full ${isTabContent ? '' : 'mt-4'}`}>
         <div className="flex justify-between items-center pb-2">
-          <h3 className="text-[15px] font-semibold text-white">
+          <h3 className="text-[15px] font-semibold text-white flex items-center gap-2">
             {isTabContent ? capitalize(name.split(".").pop()?.replace(/_/g, " ") || "") : fieldName}
+            <span className="text-white/50 text-xs px-2 py-0.5 rounded-full bg-white/5">
+              <SlidingNumber number={arrayValue.length} /> items
+            </span>
           </h3>
-          <button type="button" className="text-[12px] font-medium bg-transparent hover:bg-white/5 text-text-primary px-2 py-1 rounded transition-colors flex items-center gap-1 border border-transparent hover:border-white/10 backdrop-blur-sm">
+          <Button onClick={handleAddItem} variant="outline" type="button" className="h-8 text-[12px] bg-transparent hover:bg-white/5 border-transparent hover:border-white/10 text-white gap-1 transition-all">
             <span className="material-symbols-outlined text-[14px]">add</span> Add Item
-          </button>
+          </Button>
         </div>
         <div className={`flex flex-col gap-6 mt-2 ${isTabContent ? '' : 'border-l-2 border-white/10 ml-[1px] pl-5'}`}>
-          {value.map((item, index) => (
+          {arrayValue.map((item: any, index: number) => (
             <div key={index} className="relative group w-full pt-1 pb-3">
-              <button type="button" className="absolute top-0 right-0 text-white/30 hover:text-red-400 bg-transparent p-1 rounded opacity-0 group-hover:opacity-100 transition-all z-10 backdrop-blur-sm">
+              <button 
+                type="button" 
+                onClick={() => handleRemoveItem(index)}
+                className="absolute top-0 right-0 text-white/30 hover:text-red-400 bg-transparent p-1 rounded opacity-0 group-hover:opacity-100 transition-all z-10 backdrop-blur-sm"
+              >
                 <span className="material-symbols-outlined text-[16px] block">delete</span>
               </button>
               <div className="flex-1 w-full">
@@ -213,9 +251,10 @@ function RecursiveField({
 }
 
 export function DynamicForm({ initialData, activeTab, onSave, onDiscard }: DynamicFormProps) {
-  const { control, handleSubmit, reset, formState: { isDirty } } = useForm({
+  const methods = useForm({
     defaultValues: initialData,
   });
+  const { control, handleSubmit, reset, formState: { isDirty } } = methods;
 
   const onSubmit = (data: any) => {
     onSave(data);
@@ -242,40 +281,57 @@ export function DynamicForm({ initialData, activeTab, onSave, onDiscard }: Dynam
   const complexKeys = keys.filter(k => !isSingleField(initialData[k]));
 
   return (
-    <div className="flex-1 flex flex-col justify-between h-full relative">
-      <form id="dynamic-editor-form" onSubmit={handleSubmit(onSubmit)} className="w-full flex flex-col h-full overflow-hidden">
-        {/* Tabs Content */}
-        <div className="p-6 overflow-y-auto flex-1 pb-32">
-          {groupedKeys.length > 0 && (
-            <div className={activeTab === '__general__' ? "block" : "hidden"}>
-              <div className="flex flex-col">
-                {groupedKeys.map((key, index) => (
-                  <div key={key}>
-                    <RecursiveField name={key} value={initialData[key]} control={control} level={0} />
-                    {index < groupedKeys.length - 1 && (
-                      <hr className="my-8 border-white/5" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+    <FormProvider {...methods}>
+      <div className="flex-1 flex flex-col justify-between h-full relative">
+        <form id="dynamic-editor-form" onSubmit={handleSubmit(onSubmit)} className="w-full flex flex-col h-full overflow-hidden">
+          {/* Tabs Content */}
+          <div className="p-6 overflow-y-auto flex-1 pb-32">
+            <AnimatePresence mode="wait">
+              {groupedKeys.length > 0 && activeTab === '__general__' && (
+                <motion.div 
+                  key="__general__"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col"
+                >
+                  {groupedKeys.map((key, index) => (
+                    <div key={key}>
+                      <RecursiveField name={key} value={initialData[key]} control={control} level={0} />
+                      {index < groupedKeys.length - 1 && (
+                        <hr className="my-8 border-white/5" />
+                      )}
+                    </div>
+                  ))}
+                </motion.div>
+              )}
 
-          {complexKeys.map(key => (
-            <div key={key} className={activeTab === key ? "block" : "hidden"}>
-              <RecursiveField name={key} value={initialData[key]} control={control} level={0} />
-            </div>
-          ))}
-        </div>
-      </form>
-      
-      {isDirty && (
-        <ActionFooter 
-          isDirty={isDirty}
-          onSave={handleSubmit(onSubmit)}
-          onDiscard={handleDiscard}
-        />
-      )}
-    </div>
+              {complexKeys.map(key => (
+                activeTab === key && (
+                  <motion.div 
+                    key={key} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <RecursiveField name={key} value={initialData[key]} control={control} level={0} />
+                  </motion.div>
+                )
+              ))}
+            </AnimatePresence>
+          </div>
+        </form>
+        
+        {isDirty && (
+          <ActionFooter 
+            isDirty={isDirty}
+            onSave={handleSubmit(onSubmit)}
+            onDiscard={handleDiscard}
+          />
+        )}
+      </div>
+    </FormProvider>
   );
 }
