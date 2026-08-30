@@ -112,7 +112,7 @@ export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: G
     <div className="w-full pb-12">
       <div className="flex flex-col border border-white/10 rounded-xl bg-[#121212] shadow-lg overflow-hidden">
         {diffs.map((diff, i) => (
-          <div key={i} className="flex flex-col border-b border-white/5 last:border-b-0 py-3 group even:bg-[#181818] odd:bg-[#121212]">
+          <div key={i} className="flex flex-col border-b border-white/5 last:border-b-0 py-3 group">
             {/* Header */}
             <div className="flex justify-between items-center mb-1.5 px-4">
               <div className="flex items-center gap-2">
@@ -123,9 +123,9 @@ export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: G
               </div>
               <Button 
                 onClick={() => handleRevert(diff)}
-                className="h-6 text-[10px] px-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all font-medium rounded-md opacity-0 group-hover:opacity-100"
+                className="h-7 text-[11px] px-3.5 bg-white/5 hover:bg-error/10 hover:text-error hover:border-error/20 text-white/90 border border-white/10 transition-all font-medium rounded-md opacity-0 group-hover:opacity-100 flex items-center"
               >
-                <span className="material-symbols-outlined text-[12px] mr-1">undo</span>
+                <span className="material-symbols-outlined text-[13px] mr-1.5">undo</span>
                 Revert
               </Button>
             </div>
@@ -134,7 +134,7 @@ export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: G
             <div className="flex flex-col gap-0 font-code-sm text-[12.5px] px-2">
               {/* Old Value */}
               {diff.oldValue !== undefined && (
-                <div className="flex items-start gap-4 py-1.5 px-2 hover:bg-white/[0.03] rounded-md transition-colors">
+                <div className="flex items-start gap-4 py-1.5 px-2 bg-transparent hover:bg-error/[0.06] rounded-md transition-colors">
                   <div className="w-6 shrink-0 text-right text-error/50 select-none">-</div>
                   <div className="flex-1 text-error/80 whitespace-pre-wrap break-words line-through decoration-error/30">
                     {typeof diff.oldValue === 'object' ? JSON.stringify(diff.oldValue, null, 2) : String(diff.oldValue)}
@@ -144,7 +144,7 @@ export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: G
               
               {/* New Value */}
               {diff.newValue !== undefined && (
-                <div className="flex items-start gap-4 py-1.5 px-2 hover:bg-white/[0.03] rounded-md transition-colors">
+                <div className="flex items-start gap-4 py-1.5 px-2 bg-white/[0.02] hover:bg-[#34d399]/[0.06] rounded-md transition-colors">
                   <div className="w-6 shrink-0 text-right text-[#34d399]/50 select-none">+</div>
                   <div className="flex-1 text-[#34d399]/90 whitespace-pre-wrap break-words">
                     {typeof diff.newValue === 'object' ? JSON.stringify(diff.newValue, null, 2) : String(diff.newValue)}
