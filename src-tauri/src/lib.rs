@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
+use std::process::Command;
 
 #[derive(Serialize, Deserialize)]
 pub struct FileNode {
@@ -111,6 +112,147 @@ fn search_files(path: &str, query: &str) -> Result<Vec<SearchResult>, String> {
     Ok(results)
 }
 
+#[derive(Serialize)]
+pub struct GitStatusItem {
+    pub file: String,
+    pub status: String,
+}
+
+#[derive(Serialize)]
+pub struct GitCommitLog {
+    pub hash: String,
+    pub message: String,
+    pub author: String,
+    pub date: String,
+    pub refs: String,
+}
+
+#[tauri::command]
+fn get_git_status(path: &str) -> Result<Vec<GitStatusItem>, String> {
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(["status", "-s"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    let status_str = String::from_utf8_lossy(&output.stdout);
+    let mut items = Vec::new();
+
+    for line in status_str.lines() {
+        if line.len() > 3 {
+            let status = line[0..2].to_string();
+            let file = line[3..].to_string();
+            items.push(GitStatusItem { file, status });
+        }
+    }
+
+    Ok(items)
+}
+
+#[tauri::command]
+fn get_git_log(path: &str) -> Result<Vec<GitCommitLog>, String> {
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(["log", "-n", "50", "--pretty=format:%H|%s|%an|%ad|%D", "--date=short"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    let log_str = String::from_utf8_lossy(&output.stdout);
+    let mut logs = Vec::new();
+
+    for line in log_str.lines() {
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() >= 4 {
+            logs.push(GitCommitLog {
+                hash: parts[0].to_string(),
+                message: parts[1].to_string(),
+                author: parts[2].to_string(),
+                date: parts[3].to_string(),
+                refs: if parts.len() > 4 { parts[4].to_string() } else { "".to_string() },
+            });
+        }
+    }
+
+    Ok(logs)
+}
+
+#[tauri::command]
+fn git_add(path: &str, files: Vec<&str>) -> Result<(), String> {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(path).arg("add");
+    
+    for f in files {
+        cmd.arg(f);
+    }
+    
+    let output = cmd.output().map_err(|e| e.to_string())?;
+    
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn git_commit(path: &str, message: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(["commit", "-m", message])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn git_push(path: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(["push"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn git_show_file(path: &str, file: &str) -> Result<String, String> {
+    // Convert backslashes to forward slashes for git
+    let normalized_file = file.replace("\\", "/");
+    
+    // Prefix with ./ so git resolves it relative to the current directory (path)
+    // instead of the git root directory.
+    let target = format!("HEAD:./{}", normalized_file);
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(["show", &target])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -122,7 +264,13 @@ pub fn run() {
             read_file,
             write_file,
             upload_media,
-            search_files
+            search_files,
+            get_git_status,
+            get_git_log,
+            git_add,
+            git_commit,
+            git_push,
+            git_show_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

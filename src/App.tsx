@@ -6,6 +6,7 @@ import "./App.css";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TitleBar } from "./components/layout/TitleBar";
 import { DynamicForm } from "./components/editor/DynamicForm";
+import { GitDiffEditor } from "./components/editor/GitDiffEditor";
 import { parseFileContent, stringifyFileContent } from "./utils/parser";
 import {
   Accordion,
@@ -24,6 +25,7 @@ function App() {
   const [contentPath, setContentPath] = useState<string>("");
   const [activePath, setActivePath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("");
+  const [viewMode, setViewMode] = useState<'editor' | 'diff'>('editor');
   const [fileData, setFileData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ function App() {
     loadRecent();
   }, []);
 
-  const handleSelectFile = async (path: string, section?: string) => {
+  const handleSelectFile = async (path: string, section?: string, mode?: 'editor' | 'diff') => {
     try {
       setIsLoading(true);
       setError(null);
@@ -64,6 +66,14 @@ function App() {
       } else {
         setActiveTab('');
       }
+
+      if (mode) {
+        setViewMode(mode);
+      } else if (viewMode === 'diff') {
+        // Reset to editor when clicking a normal file unless mode is explicitly passed
+        setViewMode('editor');
+      }
+
     } catch (err: any) {
       setError(err.toString());
     } finally {
@@ -278,7 +288,7 @@ function App() {
           ) : activePath ? (
             <>
               {/* Header & Breadcrumbs */}
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
                 <div>
                   <nav className="flex items-center gap-2 font-code-sm text-code-sm text-text-muted mb-4">
                     <span className="hover:text-primary transition-colors">{contentPath.split(/[/\\]/).pop()}</span>
@@ -289,6 +299,22 @@ function App() {
                     File Editor
                   </h2>
                 </div>
+                
+                {/* View Mode Toggle */}
+                <div className="flex bg-[#121212] rounded-lg p-1 border border-white/5 shadow-inner">
+                  <button 
+                    onClick={() => setViewMode('editor')}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${viewMode === 'editor' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}
+                  >
+                    Editor
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('diff')}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${viewMode === 'diff' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}
+                  >
+                    Diff
+                  </button>
+                </div>
               </div>
 
               {isLoading ? (
@@ -296,13 +322,33 @@ function App() {
               ) : error ? (
                 <p className="text-error">Error: {error}</p>
               ) : fileData ? (
-                <DynamicForm 
-                  key={activePath} 
-                  initialData={fileData}
-                  activeTab={activeTab}
-                  onSave={handleSave}
-                  onDiscard={() => setFileData({ ...fileData })}
-                />
+                viewMode === 'editor' ? (
+                  <DynamicForm 
+                    key={activePath} 
+                    initialData={fileData}
+                    activeTab={activeTab}
+                    onSave={handleSave}
+                    onDiscard={() => setFileData({ ...fileData })}
+                  />
+                ) : (
+                  <GitDiffEditor 
+                    activePath={activePath}
+                    contentPath={contentPath}
+                    fileData={fileData}
+                    onRevert={(newData) => {
+                      setFileData(newData);
+                      // Auto save when reverting
+                      try {
+                        const content = stringifyFileContent(newData, activePath);
+                        invoke("write_file", { path: activePath, content }).then(() => {
+                          console.log("Reverted and saved successfully");
+                        });
+                      } catch (e) {
+                        console.error("Failed to auto-save after revert", e);
+                      }
+                    }}
+                  />
+                )
               ) : (
                 <p className="text-text-muted">No data found.</p>
               )}
