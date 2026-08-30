@@ -105,7 +105,7 @@ function RecursiveField({
                   <Input
                     {...field}
                     type="text"
-                    className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full backdrop-blur-sm ${
+                    className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full ${
                       isDirty 
                         ? "border-primary hover:border-primary/80 focus:border-primary" 
                         : "border-white/10 hover:border-white/20 focus:border-white/40"
@@ -119,7 +119,7 @@ function RecursiveField({
                       field.onChange(selected);
                     }
                   }}
-                  className="shrink-0 px-3 h-[36px] rounded-md bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors flex items-center justify-center backdrop-blur-sm"
+                  className="shrink-0 px-3 h-[36px] rounded-md bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors flex items-center justify-center"
                 >
                   <span className="material-symbols-outlined text-[18px]">folder</span>
                 </button>
@@ -127,7 +127,7 @@ function RecursiveField({
             ) : isMultiline ? (
               <AutoResizeTextarea
                 {...field}
-                className={`bg-transparent border rounded-md px-3 py-2 text-[13px] text-white focus:outline-none transition-all min-h-[36px] w-full md:max-w-xl backdrop-blur-sm ${
+                className={`bg-transparent border rounded-md px-3 py-2 text-[13px] text-white focus:outline-none transition-all min-h-[36px] w-full md:max-w-xl ${
                   isDirty 
                     ? "border-primary hover:border-primary/80 focus:border-primary" 
                     : "border-white/10 hover:border-white/20 focus:border-white/40"
@@ -137,7 +137,7 @@ function RecursiveField({
               <Input
                 {...field}
                 type="text"
-                className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm ${
+                className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full md:max-w-xl ${
                   isDirty 
                     ? "border-primary hover:border-primary/80 focus:border-primary" 
                     : "border-white/10 hover:border-white/20 focus:border-white/40"
@@ -174,7 +174,7 @@ function RecursiveField({
                   />
                   <label
                     htmlFor={`toggle-${name}`}
-                    className="toggle-label block overflow-hidden h-5 rounded-full bg-white/20 cursor-pointer text-[0px] backdrop-blur-sm"
+                    className="toggle-label block overflow-hidden h-5 rounded-full bg-white/20 cursor-pointer text-[0px]"
                   >
                     Toggle
                   </label>
@@ -201,7 +201,7 @@ function RecursiveField({
               <Input
                 type="text"
                 {...field}
-                className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm ${
+                className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full md:max-w-xl ${
                   isDirty 
                     ? "border-primary hover:border-primary/80 focus:border-primary" 
                     : "border-white/10 hover:border-white/20 focus:border-white/40"
@@ -274,7 +274,7 @@ function RecursiveField({
               <button 
                 type="button" 
                 onClick={() => handleRemoveItem(index)}
-                className="absolute top-0 right-0 text-white/30 hover:text-red-400 bg-transparent p-1 rounded opacity-0 group-hover:opacity-100 transition-all z-10 backdrop-blur-sm"
+                className="absolute top-0 right-0 text-white/30 hover:text-red-400 bg-transparent p-1 rounded opacity-0 group-hover:opacity-100 transition-all z-10"
               >
                 <span className="material-symbols-outlined text-[16px] block">delete</span>
               </button>
