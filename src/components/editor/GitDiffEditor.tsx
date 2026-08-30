@@ -110,38 +110,33 @@ export function GitDiffEditor({ activePath, contentPath, fileData, onRevert }: G
 
   if (diffs.length === 0) {
     return (
-      <div className="w-full pb-12">
+      <div className="w-full pb-12 mt-6">
+        <p className="text-white/40 text-[12px] mb-3 px-2 flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[14px]">info</span>
+          The file's formatting has changed, or it was modified externally. The logical data remains identical.
+        </p>
         <div className="flex flex-col border border-white/10 rounded-xl bg-[#121212] shadow-lg overflow-hidden">
           <details className="group">
-            <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-white/[0.02] transition-colors outline-none">
+            <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-white/[0.02] transition-colors outline-none bg-[#161616]">
               <span className="material-symbols-outlined text-[14px] text-text-muted group-open:rotate-90 transition-transform duration-200">chevron_right</span>
-              <span className="text-[13px] font-medium text-white/80">External or Formatting Changes</span>
+              <span className="text-[13px] font-medium text-white/80">View Raw Git Diff</span>
             </summary>
-            <div className="px-10 py-4 bg-[#161616] border-t border-white/5 text-[13px] text-white/60 leading-relaxed flex flex-col items-start gap-4">
-              <p>This file was modified outside of the CMS (or its text formatting has changed). The actual data content remains identical.</p>
-              {rawGitDiff && (
-                <div className="w-full mt-2 rounded-md bg-[#1e1e1e] border border-white/5 overflow-hidden">
-                  <div className="bg-black/40 px-4 py-2 border-b border-white/5 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[14px] text-white/40">code</span>
-                    <span className="text-[11px] font-medium text-white/60 uppercase tracking-wider">Raw Git Diff</span>
+            {rawGitDiff && (
+              <pre className="p-4 text-[12px] font-mono leading-relaxed overflow-x-auto text-white/70 whitespace-pre-wrap break-all border-t border-white/5 bg-[#121212]">
+                {rawGitDiff.split('\n').map((line, i) => (
+                  <div 
+                    key={i} 
+                    className={`
+                      ${line.startsWith('+') ? 'text-green-400 bg-green-500/5' : ''}
+                      ${line.startsWith('-') ? 'text-red-400 bg-red-500/5' : ''}
+                      ${line.startsWith('@') ? 'text-blue-400 opacity-70' : ''}
+                    `}
+                  >
+                    {line}
                   </div>
-                  <pre className="p-4 text-[12px] font-mono leading-relaxed overflow-x-auto text-white/70 whitespace-pre-wrap break-all">
-                    {rawGitDiff.split('\n').map((line, i) => (
-                      <div 
-                        key={i} 
-                        className={`
-                          ${line.startsWith('+') ? 'text-green-400 bg-green-500/5' : ''}
-                          ${line.startsWith('-') ? 'text-red-400 bg-red-500/5' : ''}
-                          ${line.startsWith('@') ? 'text-blue-400 opacity-70' : ''}
-                        `}
-                      >
-                        {line}
-                      </div>
-                    ))}
-                  </pre>
-                </div>
-              )}
-            </div>
+                ))}
+              </pre>
+            )}
           </details>
         </div>
       </div>

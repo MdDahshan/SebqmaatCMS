@@ -25,6 +25,7 @@ function App() {
   const [contentPath, setContentPath] = useState<string>("");
   const [activePath, setActivePath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("");
+  const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'editor' | 'diff'>('editor');
   const [fileData, setFileData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -206,19 +207,97 @@ function App() {
                     </AccordionItem>
                   </Accordion>
                 )}
-                {complexKeys.map((key) => (
-                  <button
-                    key={key}
-                    onClick={() => setActiveTab(key)}
-                    className={`text-left px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all ${
-                      activeTab === key
-                        ? "bg-white/10 text-white"
-                        : "text-text-muted hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </button>
-                ))}
+                {complexKeys.map((key) => {
+                  const val = fileData[key];
+                  const isArray = Array.isArray(val);
+                  const itemCount = isArray ? val.length : 0;
+                  const showDropdown = isArray && itemCount > 3;
+
+                  if (showDropdown) {
+                    return (
+                      <Accordion
+                        key={key}
+                        value={activeTab === key ? [key] : []}
+                        onValueChange={(v) => {
+                          // Always navigate to the tab when toggling
+                          setActiveTab(key);
+                          setActiveItemIndex(null);
+                        }}
+                      >
+                        <AccordionItem value={key} className="border-none">
+                          <AccordionTrigger
+                            className={`px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all hover:no-underline ${
+                              activeTab === key
+                                ? "bg-white/10 text-white"
+                                : "text-text-muted hover:text-white hover:bg-white/5"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 w-full">
+                              {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              <span className="ml-auto text-[10px] text-white/40 font-normal pr-1">{itemCount}</span>
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="pl-4 border-l border-white/10 ml-5 mt-1 space-y-0.5 mb-2">
+                              {val.map((item: any, idx: number) => {
+                                const label = (() => {
+                                  if (!item || typeof item !== 'object') {
+                                    return String(item ?? `Item ${idx + 1}`);
+                                  }
+                                  // Try common name fields first
+                                  const named = item.title || item.name || item.label || item.platform || item.heading || item.text || item.key || null;
+                                  if (named) return named;
+                                  // Fall back to the actual value of the first field
+                                  const firstVal = Object.values(item)[0];
+                                  if (firstVal !== null && firstVal !== undefined && firstVal !== '') {
+                                    return String(firstVal);
+                                  }
+                                  return `Item ${idx + 1}`;
+                                })();
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveTab(key);
+                                      setActiveItemIndex(idx);
+                                      setTimeout(() => {
+                                        const el = document.getElementById(`array-item-${key}-${idx}`);
+                                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                      }, 80);
+                                    }}
+                                    className={`w-full text-left px-2 py-1.5 rounded-md text-[12px] transition-all flex items-center gap-2 ${
+                                      activeTab === key && activeItemIndex === idx
+                                        ? 'text-white bg-white/8'
+                                        : 'text-text-muted hover:text-white hover:bg-white/5'
+                                    }`}
+                                  >
+                                    <span className="w-4 h-4 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[9px] shrink-0">{idx + 1}</span>
+                                    <span className="truncate">{label}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => { setActiveTab(key); setActiveItemIndex(null); }}
+                      className={`text-left px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all ${
+                        activeTab === key
+                          ? "bg-white/10 text-white"
+                          : "text-text-muted hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );

@@ -199,7 +199,7 @@ function RecursiveField({
         </div>
         <div className={`flex flex-col gap-6 mt-2 ${isTabContent ? '' : 'border-l-2 border-white/10 ml-[1px] pl-5'}`}>
           {arrayValue.map((item: any, index: number) => (
-            <div key={index} className="relative group w-full pt-1 pb-3">
+            <div key={index} id={`array-item-${name}-${index}`} className="relative group w-full pt-1 pb-3 scroll-mt-8">
               <button 
                 type="button" 
                 onClick={() => handleRemoveItem(index)}
