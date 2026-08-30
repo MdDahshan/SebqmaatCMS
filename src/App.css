@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #121212;
+  --color-surface: #121212;
+  --color-surface-container-lowest: #000000;
+  --color-surface-container-low: #141416;
+  --color-surface-container: #1c1c1f;
+  --color-surface-container-high: #27272a;
+  --color-surface-container-highest: #3f3f46;
+  --color-border-low: rgba(255, 255, 255, 0.06);
+  --color-border-medium: rgba(255, 255, 255, 0.12);
+  --color-border-high: rgba(255, 255, 255, 0.2);
+  --color-text-primary: #ededed;
+  --color-text-muted: #8a8a93;
+  --color-primary: #ffffff;
+  --color-on-primary: #000000;
+  --color-error: #f87171;
+  --color-outline: #3f3f46;
+  --color-outline-variant: #27272a;
+  --color-text-disabled: rgba(255, 255, 255, 0.3);
+
+  --spacing-margin-mobile: 20px;
+  --spacing-component-padding-y: 12px;
+  --spacing-container-max: 1440px;
+  --spacing-section-gap: 120px;
+  --spacing-component-padding-x: 16px;
+  --spacing-gutter: 24px;
+  --spacing-margin-desktop: 64px;
+
+  --font-label-md: Inter;
+  --font-headline-lg-mobile: "Kumar One";
+  --font-body-lg: Literata;
+  --font-headline-lg: "Kumar One";
+  --font-display: "Kumar One";
+  --font-body-md: Literata;
+  --font-code-sm: Inter;
+
+  --text-label-md: 14px;
+  --text-label-md--line-height: 20px;
+  --text-label-md--letter-spacing: 0.02em;
+  --text-label-md--font-weight: 500;
+
+  --text-headline-lg-mobile: 24px;
+  --text-headline-lg-mobile--line-height: 1.2;
+  --text-headline-lg-mobile--font-weight: 400;
+
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 1.6;
+  --text-body-lg--letter-spacing: 0.01em;
+  --text-body-lg--font-weight: 400;
+
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 1.2;
+  --text-headline-lg--font-weight: 400;
+
+  --text-display: 64px;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 400;
+
+  --text-body-md: 16px;
+  --text-body-md--line-height: 1.6;
+  --text-body-md--font-weight: 400;
+
+  --text-code-sm: 13px;
+  --text-code-sm--line-height: 18px;
+  --text-code-sm--font-weight: 400;
+}
+
+body, html, #root {
+  background-color: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-body-md);
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.toggle-checkbox:checked {
+  right: 0;
+  border-color: #ffffff;
+}
+.toggle-checkbox:checked + .toggle-label {
+  background-color: #ffffff;
+}
+.toggle-checkbox:checked + .toggle-label:after {
+  transform: translateX(100%);
+  border-color: #ffffff;
+}
