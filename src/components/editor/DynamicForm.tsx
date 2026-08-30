@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm, Controller, FormProvider, useFormContext, useWatch } from "react-hook-form";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ActionFooter } from "../layout/ActionFooter";
@@ -12,9 +13,11 @@ function capitalize(str: string) {
 
 interface DynamicFormProps {
   initialData: any;
+  draftData?: any;
   activeTab: string;
   onSave: (data: any) => void;
   onDiscard: () => void;
+  onDraftUpdate?: (data: any) => void;
 }
 
 function RecursiveField({
@@ -30,6 +33,17 @@ function RecursiveField({
 }) {
   const type = typeof value;
   const fieldName = name ? capitalize(name.split(".").pop() || "") : "General Details";
+
+  const { formState: { dirtyFields } } = useFormContext();
+  const getIsDirty = (n: string) => {
+    let current: any = dirtyFields;
+    for (const part of n.split('.')) {
+      if (!current) return false;
+      current = current[part];
+    }
+    return current === true || (typeof current === 'object' && Object.keys(current).length > 0);
+  };
+  const isDirty = name ? getIsDirty(name) : false;
 
   const isMultiline = type === "string" && (value.length > 50 || value.includes("\n"));
   const isUrl = type === "string" && (
@@ -49,10 +63,11 @@ function RecursiveField({
 
   if (type === "string") {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 relative">
         <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
           {fieldName}
           <span className="text-[10px] font-normal text-text-muted">String</span>
+          {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
         </label>
         <Controller
           name={name}
@@ -60,11 +75,15 @@ function RecursiveField({
           render={({ field }) =>
             isPath ? (
               <div className="flex gap-2 w-full md:max-w-2xl">
-                <Input
-                  {...field}
-                  type="text"
-                  className="bg-transparent border-white/10 h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full backdrop-blur-sm"
-                />
+                  <Input
+                    {...field}
+                    type="text"
+                    className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full backdrop-blur-sm ${
+                      isDirty 
+                        ? "border-primary hover:border-primary/80 focus:border-primary" 
+                        : "border-white/10 hover:border-white/20 focus:border-white/40"
+                    }`}
+                  />
                 <button
                   type="button"
                   onClick={async () => {
@@ -81,13 +100,21 @@ function RecursiveField({
             ) : isMultiline ? (
               <textarea
                 {...field}
-                className="bg-transparent border border-white/10 rounded-md p-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all min-h-[100px] w-full backdrop-blur-sm"
+                className={`bg-transparent border rounded-md p-3 text-[13px] text-white focus:outline-none transition-all min-h-[100px] w-full backdrop-blur-sm ${
+                  isDirty 
+                    ? "border-primary hover:border-primary/80 focus:border-primary" 
+                    : "border-white/10 hover:border-white/20 focus:border-white/40"
+                }`}
               />
             ) : (
               <Input
                 {...field}
                 type="text"
-                className="bg-transparent border-white/10 h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm"
+                className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm ${
+                  isDirty 
+                    ? "border-primary hover:border-primary/80 focus:border-primary" 
+                    : "border-white/10 hover:border-white/20 focus:border-white/40"
+                }`}
               />
             )
           }
@@ -102,6 +129,7 @@ function RecursiveField({
         <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
           {fieldName}
           <span className="text-[10px] font-normal text-text-muted">Boolean</span>
+          {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
         </label>
         <div className="flex items-center h-[36px] w-full md:max-w-xl">
           <div className="relative inline-block w-9 mr-2 align-middle select-none transition duration-200 ease-in">
@@ -135,18 +163,23 @@ function RecursiveField({
   if (type === "number") {
     return (
       <div className="flex flex-col gap-2">
-        <label className="text-[13px] font-medium text-text-primary">
+        <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
           {fieldName}
+          {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
         </label>
         <Controller
           name={name}
           control={control}
           render={({ field }) => (
-            <Input
-              type="text"
-              {...field}
-              className="bg-transparent border-white/10 h-[36px] px-3 text-[13px] text-white hover:border-white/20 focus:border-white/40 focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm"
-            />
+              <Input
+                type="text"
+                {...field}
+                className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full md:max-w-xl backdrop-blur-sm ${
+                  isDirty 
+                    ? "border-primary hover:border-primary/80 focus:border-primary" 
+                    : "border-white/10 hover:border-white/20 focus:border-white/40"
+                }`}
+              />
           )}
         />
       </div>
@@ -184,6 +217,17 @@ function RecursiveField({
       setValue(name, currentArray.filter((_: any, i: number) => i !== indexToRemove), { shouldDirty: true });
     };
 
+    // Listen for context menu remove events
+    useEffect(() => {
+      const handler = (e: Event) => {
+        const { name: targetName, idx } = (e as CustomEvent).detail;
+        if (targetName === name) handleRemoveItem(idx);
+      };
+      window.addEventListener("cms:remove-item", handler);
+      return () => window.removeEventListener("cms:remove-item", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [name]);
+
     return (
       <div className={`flex flex-col w-full ${isTabContent ? '' : 'mt-4'}`}>
         <div className="flex justify-between items-center pb-2">
@@ -199,7 +243,7 @@ function RecursiveField({
         </div>
         <div className={`flex flex-col gap-6 mt-2 ${isTabContent ? '' : 'border-l-2 border-white/10 ml-[1px] pl-5'}`}>
           {arrayValue.map((item: any, index: number) => (
-            <div key={index} id={`array-item-${name}-${index}`} className="relative group w-full pt-1 pb-3 scroll-mt-8">
+            <div key={index} id={`array-item-${name}-${index}`} className="relative group w-full pt-1 pb-3 scroll-mt-8" data-context="array-item" data-item-name={name} data-item-index={index}>
               <button 
                 type="button" 
                 onClick={() => handleRemoveItem(index)}
@@ -250,11 +294,24 @@ function RecursiveField({
   return null;
 }
 
-export function DynamicForm({ initialData, activeTab, onSave, onDiscard }: DynamicFormProps) {
+export function DynamicForm({ initialData, draftData, activeTab, onSave, onDiscard, onDraftUpdate }: DynamicFormProps) {
   const methods = useForm({
-    defaultValues: initialData,
+    defaultValues: draftData || initialData,
   });
-  const { control, handleSubmit, reset, formState: { isDirty } } = methods;
+  const { control, handleSubmit, reset, formState: { isDirty }, watch } = methods;
+
+  const currentValues = watch();
+
+  useEffect(() => {
+    if (!onDraftUpdate) return;
+    const strInitial = JSON.stringify(initialData);
+    const strCurrent = JSON.stringify(currentValues);
+    if (strInitial !== strCurrent) {
+      onDraftUpdate(currentValues);
+    } else {
+      onDraftUpdate(undefined);
+    }
+  }, [currentValues, initialData, onDraftUpdate]);
 
   const onSubmit = (data: any) => {
     onSave(data);
@@ -265,6 +322,11 @@ export function DynamicForm({ initialData, activeTab, onSave, onDiscard }: Dynam
     reset(initialData);
     onDiscard();
   };
+
+  // We consider the form dirty if the current values are different from the original file data.
+  // react-hook-form's isDirty compares against defaultValues, which could be draftData.
+  // So we calculate actual dirty state manually.
+  const actualIsDirty = JSON.stringify(initialData) !== JSON.stringify(currentValues);
 
   if (!initialData || Object.keys(initialData).length === 0) {
     return <p className="text-text-muted">No editable data found.</p>;
@@ -282,7 +344,7 @@ export function DynamicForm({ initialData, activeTab, onSave, onDiscard }: Dynam
 
   return (
     <FormProvider {...methods}>
-      <div className="flex-1 flex flex-col justify-between h-full relative">
+      <div className="flex-1 flex flex-col justify-between h-full">
         <form id="dynamic-editor-form" onSubmit={handleSubmit(onSubmit)} className="w-full flex flex-col h-full overflow-hidden">
           {/* Tabs Content */}
           <div className="p-6 overflow-y-auto flex-1 pb-32">
@@ -324,9 +386,9 @@ export function DynamicForm({ initialData, activeTab, onSave, onDiscard }: Dynam
           </div>
         </form>
         
-        {isDirty && (
+        {actualIsDirty && (
           <ActionFooter 
-            isDirty={isDirty}
+            isDirty={actualIsDirty}
             onSave={handleSubmit(onSubmit)}
             onDiscard={handleDiscard}
           />

@@ -18,11 +18,20 @@ export interface SearchResult {
   snippet: string;
 }
 
+interface FileTreeItemProps {
+  node: FileNode;
+  level: number;
+  onSelectFile: (path: string) => void;
+  selectedFilePath: string | null;
+  drafts?: Record<string, any>;
+}
+
 interface SidebarProps {
   contentPath: string;
   onSelectFile: (path: string, section?: string, mode?: 'editor' | 'diff') => void;
   selectedFilePath: string | null;
   onNewFile?: () => void;
+  drafts?: Record<string, any>;
 }
 
 function FileTreeItem({
@@ -30,12 +39,8 @@ function FileTreeItem({
   level = 0,
   onSelectFile,
   selectedFilePath,
-}: {
-  node: FileNode;
-  level?: number;
-  onSelectFile: (path: string) => void;
-  selectedFilePath: string | null;
-}) {
+  drafts,
+}: FileTreeItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isSelected = selectedFilePath === node.path;
 
@@ -61,6 +66,7 @@ function FileTreeItem({
                 level={level + 1}
                 onSelectFile={onSelectFile}
                 selectedFilePath={selectedFilePath}
+                drafts={drafts}
               />
             ))}
           </div>
@@ -76,14 +82,19 @@ function FileTreeItem({
       }`}
       style={{ paddingLeft: `${level * 12 + 32}px` }}
       onClick={() => onSelectFile(node.path)}
+      data-context="file"
+      data-file-path={node.path}
     >
       <span className="material-symbols-outlined text-[16px]">description</span>
-      <span className="truncate">{node.name}</span>
+      <span className="truncate flex-1 text-left">{node.name}</span>
+      {drafts?.[node.path] && (
+        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mr-2"></span>
+      )}
     </button>
   );
 }
 
-export function Sidebar({ contentPath, onSelectFile, selectedFilePath, onNewFile }: SidebarProps) {
+export function Sidebar({ contentPath, onSelectFile, selectedFilePath, onNewFile, drafts }: SidebarProps) {
   const [files, setFiles] = useState<FileNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -250,6 +261,7 @@ export function Sidebar({ contentPath, onSelectFile, selectedFilePath, onNewFile
                             node={node}
                             onSelectFile={onSelectFile}
                             selectedFilePath={selectedFilePath}
+                            drafts={drafts}
                           />
                         </motion.div>
                       ))}

@@ -8,6 +8,8 @@ import { TitleBar } from "./components/layout/TitleBar";
 import { DynamicForm } from "./components/editor/DynamicForm";
 import { GitDiffEditor } from "./components/editor/GitDiffEditor";
 import { parseFileContent, stringifyFileContent } from "./utils/parser";
+import { ToastProvider, useToast } from "@/components/ui/toast-provider";
+import { ContextMenuProvider } from "@/components/ui/context-menu-provider";
 import {
   Accordion,
   AccordionContent,
@@ -21,7 +23,8 @@ export const isSingleField = (val: any) => {
   return Object.keys(val).length === 1;
 };
 
-function App() {
+function AppInner() {
+  const toast = useToast();
   const [contentPath, setContentPath] = useState<string>("");
   const [activePath, setActivePath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("");
@@ -31,6 +34,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recentProjects, setRecentProjects] = useState<string[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, any>>({});
 
   useEffect(() => {
     async function loadRecent() {
@@ -43,6 +47,18 @@ function App() {
       }
     }
     loadRecent();
+  }, []);
+
+  // Listen for context menu file actions
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { action, path } = (e as CustomEvent).detail;
+      if (action === "open") handleSelectFile(path, undefined, 'editor');
+      if (action === "open-diff") handleSelectFile(path, undefined, 'diff');
+    };
+    window.addEventListener("cms:file-action", handler);
+    return () => window.removeEventListener("cms:file-action", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSelectFile = async (path: string, section?: string, mode?: 'editor' | 'diff') => {
@@ -88,12 +104,28 @@ function App() {
       const newRawContent = stringifyFileContent(dataToSave, activePath);
       await invoke("write_file", { path: activePath, content: newRawContent });
       setFileData(dataToSave);
-      alert("File saved successfully!");
+      setDrafts(prev => {
+        const next = { ...prev };
+        delete next[activePath];
+        return next;
+      });
+      toast.success("File saved successfully!");
     } catch (err: any) {
-      alert("Failed to save: " + err.toString());
+      toast.error("Failed to save: " + err.toString());
     }
   };
 
+  const handleDraftUpdate = (path: string, newDraft: any) => {
+    setDrafts(prev => {
+      const next = { ...prev };
+      if (newDraft === undefined) {
+        delete next[path];
+      } else {
+        next[path] = newDraft;
+      }
+      return next;
+    });
+  };
   const handlePickFolder = async () => {
     try {
       const selected = await open({
@@ -145,10 +177,10 @@ function App() {
 
   const handleNewFile = () => {
     if (!contentPath) {
-      alert("Please select a content folder first.");
+      toast.warning("Please select a content folder first.");
       return;
     }
-    alert("New file created! (Placeholder - Implement backend later)");
+    toast.info("New file created! (Placeholder - Implement backend later)");
   };
 
   const projectName = contentPath ? contentPath.split(/[/\\]/).filter(Boolean).slice(-2, -1)[0] : "Sebqmaat CMS";
@@ -162,6 +194,7 @@ function App() {
           onSelectFile={handleSelectFile} 
           selectedFilePath={activePath} 
           onNewFile={handleNewFile}
+          drafts={drafts}
         />
 
         {/* Sub Sidebar for Tabs */}
@@ -196,12 +229,16 @@ function App() {
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="pl-4 border-l border-white/10 ml-5 mt-1 space-y-1 mb-2">
-                          {groupedKeys.map((key) => (
-                            <div key={key} className="text-[12px] text-text-muted py-1 flex items-center gap-2">
-                              <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                              {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </div>
-                          ))}
+                          {groupedKeys.map((key) => {
+                            const hasDraft = drafts[activePath]?.[key] !== undefined && JSON.stringify(drafts[activePath][key]) !== JSON.stringify(fileData[key]);
+                            return (
+                              <div key={key} className="text-[12px] text-text-muted py-1 flex items-center gap-2">
+                                <span className={`w-1.5 h-1.5 rounded-full ${hasDraft ? 'bg-primary' : 'bg-white/30'}`}></span>
+                                <span className="flex-1">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                                {hasDraft && <span className="text-[9px] text-primary bg-primary/10 px-1 rounded">Draft</span>}
+                              </div>
+                            );
+                          })}
                         </div>
                       </AccordionContent>
                     </AccordionItem>
@@ -218,7 +255,7 @@ function App() {
                       <Accordion
                         key={key}
                         value={activeTab === key ? [key] : []}
-                        onValueChange={(v) => {
+                        onValueChange={(_) => {
                           // Always navigate to the tab when toggling
                           setActiveTab(key);
                           setActiveItemIndex(null);
@@ -233,7 +270,10 @@ function App() {
                             }`}
                           >
                             <span className="flex items-center gap-2 w-full">
-                              {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              <span className="flex-1 text-left">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                              {drafts[activePath]?.[key] !== undefined && JSON.stringify(drafts[activePath][key]) !== JSON.stringify(fileData[key]) && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mr-1"></span>
+                              )}
                               <span className="ml-auto text-[10px] text-white/40 font-normal pr-1">{itemCount}</span>
                             </span>
                           </AccordionTrigger>
@@ -284,17 +324,20 @@ function App() {
                     );
                   }
 
+                  const hasDraft = drafts[activePath]?.[key] !== undefined && JSON.stringify(drafts[activePath][key]) !== JSON.stringify(fileData[key]);
+
                   return (
                     <button
                       key={key}
                       onClick={() => { setActiveTab(key); setActiveItemIndex(null); }}
-                      className={`text-left px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all ${
+                      className={`text-left px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
                         activeTab === key
                           ? "bg-white/10 text-white"
                           : "text-text-muted hover:text-white hover:bg-white/5"
                       }`}
                     >
-                      {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      <span className="flex-1">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                      {hasDraft && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>}
                     </button>
                   );
                 })}
@@ -314,7 +357,7 @@ function App() {
 
           {/* Scrollable Content Layer */}
           <div className="flex-1 flex flex-col overflow-y-auto relative z-10 w-full h-full">
-            <div className="flex-1 p-margin-mobile md:p-margin-desktop max-w-[1200px] w-full mx-auto relative flex flex-col">
+            <div className="flex-1 p-margin-mobile md:p-margin-desktop max-w-[1200px] w-full mx-auto flex flex-col">
           {!contentPath ? (
             <div className="flex h-full flex-col items-center justify-center p-8">
               <div className="max-w-md w-full flex flex-col gap-8 items-center justify-center mt-[-10vh]">
@@ -405,9 +448,18 @@ function App() {
                   <DynamicForm 
                     key={activePath} 
                     initialData={fileData}
+                    draftData={drafts[activePath]}
                     activeTab={activeTab}
                     onSave={handleSave}
-                    onDiscard={() => setFileData({ ...fileData })}
+                    onDiscard={() => {
+                      setDrafts(prev => {
+                        const next = { ...prev };
+                        delete next[activePath];
+                        return next;
+                      });
+                      setFileData({ ...fileData });
+                    }}
+                    onDraftUpdate={(data) => handleDraftUpdate(activePath, data)}
                   />
                 ) : (
                   <GitDiffEditor 
@@ -446,3 +498,18 @@ function App() {
 }
 
 export default App;
+
+function App() {
+  const handleFileAction = (action: string, path: string) => {
+    // Dispatch to inner app — inner app listens via window events
+    window.dispatchEvent(new CustomEvent("cms:file-action", { detail: { action, path } }));
+  };
+
+  return (
+    <ToastProvider>
+      <ContextMenuProvider onFileAction={handleFileAction}>
+        <AppInner />
+      </ContextMenuProvider>
+    </ToastProvider>
+  );
+}
