@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::process::Command;
+use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 pub struct FileNode {
@@ -347,6 +348,98 @@ fn git_diff_file(path: &str, file: &str) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+fn find_file_recursively(dir: &Path, target_filename: &str, max_depth: usize) -> Option<String> {
+    if max_depth == 0 {
+        return None;
+    }
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let dir_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                if dir_name == "node_modules" || dir_name == ".git" || dir_name == "target" || dir_name == "dist" {
+                    continue;
+                }
+                if let Some(found) = find_file_recursively(&path, target_filename, max_depth - 1) {
+                    return Some(found);
+                }
+            } else if path.is_file() {
+                if let Some(file_name) = path.file_name().and_then(|s| s.to_str()) {
+                    if file_name == target_filename {
+                        if let Some(s) = path.to_str() {
+                            return Some(s.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn resolve_media_path(base_path: &str, parent_path: &str, media_path: &str) -> Result<String, String> {
+    // 0. Clean media path from quotes, backticks, or extra spaces
+    let clean_media_path = media_path.trim().trim_matches(|c| c == '"' || c == '\'' || c == '`');
+
+    let base = Path::new(base_path);
+    let parent_file = Path::new(parent_path);
+    let parent_dir = if parent_file.is_file() {
+        parent_file.parent().unwrap_or(base)
+    } else {
+        parent_file
+    };
+    
+    // 1. Check if it's an absolute path on the user's system
+    let raw_path = Path::new(clean_media_path);
+    if raw_path.is_absolute() && raw_path.exists() && raw_path.is_file() {
+        if let Some(abs_path) = raw_path.to_str() {
+            return Ok(abs_path.to_string());
+        }
+    }
+    
+    // 2. Treat as relative path (strip leading slash so it doesn't resolve to root of filesystem)
+    let relative_media_path = clean_media_path.trim_start_matches('/');
+    
+    let mut possible_paths = vec![
+        parent_dir.join(relative_media_path),
+        base.join(relative_media_path),
+        base.join("public").join(relative_media_path),
+        base.join("src").join("assets").join(relative_media_path),
+    ];
+
+    if let Some(parent) = base.parent() {
+        possible_paths.push(parent.join(relative_media_path));
+        possible_paths.push(parent.join("public").join(relative_media_path));
+        possible_paths.push(parent.join("src").join("assets").join(relative_media_path));
+    }
+
+    for path in possible_paths {
+        if path.exists() && path.is_file() {
+            if let Some(abs_path) = path.to_str() {
+                return Ok(abs_path.to_string());
+            }
+        }
+    }
+    
+    // 3. Smart fallback: Recursive search for the exact filename
+    if let Some(filename) = Path::new(&relative_media_path).file_name().and_then(|s| s.to_str()) {
+        // Try searching in the opened project base first (depth 5)
+        if let Some(found) = find_file_recursively(base, filename, 5) {
+            return Ok(found);
+        }
+        
+        // If not found, try searching in the parent directory of base (depth 4)
+        if let Some(parent) = base.parent() {
+            if let Some(found) = find_file_recursively(parent, filename, 4) {
+                return Ok(found);
+            }
+        }
+    }
+    
+    Err("Media file not found".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -368,7 +461,8 @@ pub fn run() {
             git_push,
             git_pull,
             git_show_file,
-            git_diff_file
+            git_diff_file,
+            resolve_media_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

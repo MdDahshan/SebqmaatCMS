@@ -115,17 +115,7 @@ function AppInner() {
     }
   };
 
-  const handleDraftUpdate = (path: string, newDraft: any) => {
-    setDrafts(prev => {
-      const next = { ...prev };
-      if (newDraft === undefined) {
-        delete next[path];
-      } else {
-        next[path] = newDraft;
-      }
-      return next;
-    });
-  };
+
   const handlePickFolder = async () => {
     try {
       const selected = await open({
@@ -452,14 +442,22 @@ function AppInner() {
                     activeTab={activeTab}
                     onSave={handleSave}
                     onDiscard={() => {
-                      setDrafts(prev => {
-                        const next = { ...prev };
-                        delete next[activePath];
-                        return next;
-                      });
-                      setFileData({ ...fileData });
+                      if (activePath) {
+                        const newDrafts = { ...drafts };
+                        delete newDrafts[activePath];
+                        setDrafts(newDrafts);
+                      }
                     }}
-                    onDraftUpdate={(data) => handleDraftUpdate(activePath, data)}
+                    onDraftUpdate={(data) => {
+                      if (activePath) {
+                        setDrafts(prev => ({
+                          ...prev,
+                          [activePath]: data
+                        }));
+                      }
+                    }}
+                    contentPath={contentPath}
+                    activePath={activePath}
                   />
                 ) : (
                   <GitDiffEditor 
@@ -490,8 +488,9 @@ function AppInner() {
             </div>
           )}
         </div>
-        </div>
-      </main>
+          </div>
+          <div id="footer-portal-root" className="absolute bottom-0 left-0 w-full z-50 pointer-events-none" />
+        </main>
       </div>
     </div>
   );

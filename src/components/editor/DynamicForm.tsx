@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from "react";
 import { useForm, Controller, FormProvider, useFormContext, useWatch } from "react-hook-form";
+import { MediaPreview } from "./MediaPreview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ActionFooter } from "../layout/ActionFooter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SlidingNumber } from "@/components/animate-ui/primitives/texts/sliding-number";
+import * as LucideIcons from "lucide-react";
 
 function capitalize(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -45,6 +47,8 @@ interface DynamicFormProps {
   onSave: (data: any) => void;
   onDiscard: () => void;
   onDraftUpdate?: (data: any) => void;
+  contentPath: string;
+  activePath: string | null;
 }
 
 function RecursiveField({
@@ -52,11 +56,15 @@ function RecursiveField({
   value,
   control,
   level = 0,
+  contentPath,
+  activePath
 }: {
   name: string;
   value: any;
   control: any;
   level?: number;
+  contentPath: string;
+  activePath: string | null;
 }) {
   const type = typeof value;
   const fieldName = name ? capitalize(name.split(".").pop() || "") : "General Details";
@@ -73,20 +81,42 @@ function RecursiveField({
   const isDirty = name ? getIsDirty(name) : false;
 
   const isMultiline = type === "string" && (value.length > 50 || value.includes("\n"));
-  const isUrl = type === "string" && (
-    value.startsWith("http://") || 
-    value.startsWith("https://") ||
-    name.toLowerCase().includes("url") ||
-    name.toLowerCase().includes("link") ||
-    name.toLowerCase().includes("website")
-  );
+  const isUrl = type === "string" && (value.startsWith("http://") || value.startsWith("https://"));
+
+  const isMediaExtension = (val: string) => /\.(jpg|jpeg|png|gif|svg|webp|mp4|webm|ogg|ico|bmp)$/i.test(val.split('?')[0]);
+
+
+  const hasPathSemantics = name.toLowerCase().includes("image") || 
+                           name.toLowerCase().includes("path") || 
+                           name.toLowerCase().includes("file") || 
+                           name.toLowerCase().includes("video");
+
+  const hasMediaSemantics = name.toLowerCase().includes("image") || 
+                            name.toLowerCase().includes("icon") || 
+                            name.toLowerCase().includes("video") || 
+                            name.toLowerCase().includes("cover") || 
+                            name.toLowerCase().includes("thumbnail") ||
+                            name.toLowerCase().includes("media") ||
+                            name.toLowerCase().includes("logo");
 
   const isPath = type === "string" && !isUrl && (
-    name.toLowerCase().includes("image") || 
-    name.toLowerCase().includes("path") || 
-    name.toLowerCase().includes("file") || 
-    name.toLowerCase().includes("icon")
+    value.startsWith("/") || 
+    value.startsWith("./") || 
+    value.startsWith("../") ||
+    isMediaExtension(value) ||
+    hasPathSemantics
   );
+
+  const shouldTryPreview = type === "string" && value.trim() !== "" && (isUrl || isPath);
+
+  const getIconComponent = (val: string) => {
+    if (!val || typeof val !== 'string') return null;
+    const pascal = val.split('-').map(capitalize).join('');
+    return (LucideIcons as any)[pascal] || (LucideIcons as any)[val];
+  };
+  
+  const hasIconSemantics = name.toLowerCase().includes("icon");
+  const IconComponent = hasIconSemantics && type === "string" ? getIconComponent(value) : null;
 
   if (type === "string") {
     return (
@@ -101,28 +131,31 @@ function RecursiveField({
           control={control}
           render={({ field }) =>
             isPath ? (
-              <div className="flex gap-2 w-full md:max-w-xl">
+              <div className="flex flex-col gap-2 w-full md:max-w-xl">
+                <div className="flex gap-2 w-full">
                   <Input
                     {...field}
                     type="text"
-                    className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full ${
+                    className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full backdrop-blur-sm ${
                       isDirty 
                         ? "border-primary hover:border-primary/80 focus:border-primary" 
                         : "border-white/10 hover:border-white/20 focus:border-white/40"
                     }`}
                   />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const selected = await open({ multiple: false });
-                    if (selected && typeof selected === "string") {
-                      field.onChange(selected);
-                    }
-                  }}
-                  className="shrink-0 px-3 h-[36px] rounded-md bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors flex items-center justify-center"
-                >
-                  <span className="material-symbols-outlined text-[18px]">folder</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const selected = await open({ multiple: false });
+                      if (selected && typeof selected === "string") {
+                        field.onChange(selected);
+                      }
+                    }}
+                    className="shrink-0 px-3 h-[36px] rounded-md bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors flex items-center justify-center"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">folder</span>
+                  </button>
+                </div>
+                {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={hasMediaSemantics} />}
               </div>
             ) : isMultiline ? (
               <AutoResizeTextarea
@@ -133,16 +166,36 @@ function RecursiveField({
                     : "border-white/10 hover:border-white/20 focus:border-white/40"
                 }`}
               />
+            ) : isUrl ? (
+              <div className="flex flex-col gap-2 w-full md:max-w-xl">
+                <Input
+                  {...field}
+                  type="text"
+                  className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full ${
+                    isDirty 
+                      ? "border-primary hover:border-primary/80 focus:border-primary" 
+                      : "border-white/10 hover:border-white/20 focus:border-white/40"
+                  }`}
+                />
+                {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={hasMediaSemantics} />}
+              </div>
             ) : (
-              <Input
-                {...field}
-                type="text"
-                className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full md:max-w-xl ${
-                  isDirty 
-                    ? "border-primary hover:border-primary/80 focus:border-primary" 
-                    : "border-white/10 hover:border-white/20 focus:border-white/40"
-                }`}
-              />
+              <div className="flex gap-2 w-full md:max-w-xl items-center">
+                <Input
+                  {...field}
+                  type="text"
+                  className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full ${
+                    isDirty 
+                      ? "border-primary hover:border-primary/80 focus:border-primary" 
+                      : "border-white/10 hover:border-white/20 focus:border-white/40"
+                  }`}
+                />
+                {IconComponent && (
+                  <div className="shrink-0 p-1.5 bg-white/5 border border-white/10 rounded-md flex items-center justify-center">
+                    <IconComponent className="w-5 h-5 text-white/80" />
+                  </div>
+                )}
+              </div>
             )
           }
         />
@@ -284,6 +337,8 @@ function RecursiveField({
                     value={item}
                     control={control}
                     level={level + 1}
+                    contentPath={contentPath}
+                    activePath={activePath}
                   />
               </div>
             </div>
@@ -311,6 +366,8 @@ function RecursiveField({
               value={val}
               control={control}
               level={level + 1}
+              contentPath={contentPath}
+              activePath={activePath}
             />
           ))}
         </div>
@@ -321,7 +378,7 @@ function RecursiveField({
   return null;
 }
 
-export function DynamicForm({ initialData, draftData, activeTab, onSave, onDiscard, onDraftUpdate }: DynamicFormProps) {
+export function DynamicForm({ initialData, draftData, activeTab, onSave, onDiscard, onDraftUpdate, contentPath, activePath }: DynamicFormProps) {
   const methods = useForm({
     defaultValues: draftData || initialData,
   });
@@ -329,14 +386,22 @@ export function DynamicForm({ initialData, draftData, activeTab, onSave, onDisca
 
   const currentValues = watch();
 
+  const lastDraftStrRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!onDraftUpdate) return;
     const strInitial = JSON.stringify(initialData);
     const strCurrent = JSON.stringify(currentValues);
     if (strInitial !== strCurrent) {
-      onDraftUpdate(currentValues);
+      if (lastDraftStrRef.current !== strCurrent) {
+        lastDraftStrRef.current = strCurrent;
+        onDraftUpdate(currentValues);
+      }
     } else {
-      onDraftUpdate(undefined);
+      if (lastDraftStrRef.current !== undefined) {
+        lastDraftStrRef.current = undefined as any;
+        onDraftUpdate(undefined);
+      }
     }
   }, [currentValues, initialData, onDraftUpdate]);
 
@@ -387,7 +452,7 @@ export function DynamicForm({ initialData, draftData, activeTab, onSave, onDisca
                 >
                   {groupedKeys.map((key, index) => (
                     <div key={key}>
-                      <RecursiveField name={key} value={initialData[key]} control={control} level={0} />
+                      <RecursiveField name={key} value={initialData[key]} control={control} level={0} contentPath={contentPath} activePath={activePath} />
                       {index < groupedKeys.length - 1 && (
                         <hr className="my-8 border-white/5" />
                       )}
@@ -405,7 +470,7 @@ export function DynamicForm({ initialData, draftData, activeTab, onSave, onDisca
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <RecursiveField name={key} value={initialData[key]} control={control} level={0} />
+                    <RecursiveField name={key} value={initialData[key]} control={control} level={0} contentPath={contentPath} activePath={activePath} />
                   </motion.div>
                 )
               ))}

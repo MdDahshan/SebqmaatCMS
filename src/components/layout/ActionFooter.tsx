@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { createPortal } from "react-dom";
 
 export function ActionFooter({
   isDirty,
@@ -10,7 +11,10 @@ export function ActionFooter({
   onSave: () => void;
   onDiscard: () => void;
 }) {
-  return (
+  const portalRoot = document.getElementById("footer-portal-root");
+  if (!portalRoot) return null;
+
+  return createPortal(
     <div className="absolute left-0 bottom-4 z-50 pointer-events-none">
       <motion.div 
         initial={{ opacity: 0, x: -20 }}
@@ -40,6 +44,7 @@ export function ActionFooter({
           </Button>
         </div>
       </motion.div>
-    </div>
+    </div>,
+    portalRoot
   );
 }
