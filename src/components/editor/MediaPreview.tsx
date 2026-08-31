@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { createPortal } from 'react-dom';
@@ -131,7 +131,7 @@ export function MediaPreview({ src, contentPath, activePath, explicitMediaField 
 
   if (status === 'error') {
     const isRustFailure = !assetUrl;
-    const isCodecFailure = assetUrl && isVideo;
+    const isCodecFailure = assetUrl && isDefinitelyVideo;
     
     return (
       <div className="mt-2 text-white/30 text-[11px] flex flex-col gap-1 p-2 bg-black/40 rounded border border-red-500/30">

@@ -8,6 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface ContextMenuItem {
@@ -136,84 +137,22 @@ export function ContextMenuProvider({
     const handler = async (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const fileEl = target.closest("[data-context='file']") as HTMLElement | null;
-      const inputEl = target.closest("input, textarea") as HTMLInputElement | HTMLTextAreaElement | null;
 
-      if (!fileEl && !inputEl) return;
+      if (!fileEl) return;
 
       e.preventDefault();
 
       const items: ContextMenuEntry[] = [];
+      const path = fileEl.getAttribute("data-file-path") || "";
+      const fileName = path.split(/[/\\]/).pop() || path;
 
-      if (fileEl) {
-        const path = fileEl.getAttribute("data-file-path") || "";
-        const fileName = path.split(/[/\\]/).pop() || path;
-
-        items.push(
-          { label: "Open in Editor", icon: "edit", action: () => onFileAction?.("open", path) },
-          { label: "Open as Diff", icon: "difference", action: () => onFileAction?.("open-diff", path) },
-          { separator: true },
-          { label: "Copy File Path", icon: "content_copy", action: () => navigator.clipboard.writeText(path) },
-          { label: "Copy File Name", icon: "file_copy", action: () => navigator.clipboard.writeText(fileName) },
-        );
-      } else if (inputEl) {
-        const el = inputEl;
-        const hasSelection = () => {
-          const s = (el as HTMLInputElement).selectionStart ?? 0;
-          const e2 = (el as HTMLInputElement).selectionEnd ?? 0;
-          return e2 > s;
-        };
-        const selectedText = () =>
-          el.value.slice(
-            (el as HTMLInputElement).selectionStart ?? 0,
-            (el as HTMLInputElement).selectionEnd ?? el.value.length
-          );
-
-        items.push(
-          {
-            label: "Cut",
-            icon: "content_cut",
-            disabled: !hasSelection(),
-            action: () => {
-              navigator.clipboard.writeText(selectedText());
-              const start = (el as HTMLInputElement).selectionStart ?? 0;
-              const end = (el as HTMLInputElement).selectionEnd ?? el.value.length;
-              triggerInputChange(el, el.value.slice(0, start) + el.value.slice(end));
-            },
-          },
-          {
-            label: "Copy",
-            icon: "content_copy",
-            disabled: !el.value,
-            action: () => navigator.clipboard.writeText(selectedText() || el.value),
-          },
-          {
-            label: "Paste",
-            icon: "content_paste",
-            action: async () => {
-              try {
-                const text = await navigator.clipboard.readText();
-                const start = (el as HTMLInputElement).selectionStart ?? el.value.length;
-                const end = (el as HTMLInputElement).selectionEnd ?? el.value.length;
-                triggerInputChange(el, el.value.slice(0, start) + text + el.value.slice(end));
-              } catch { /* denied */ }
-            },
-          },
-          { separator: true },
-          {
-            label: "Select All",
-            icon: "select_all",
-            disabled: !el.value,
-            action: () => { el.focus(); el.select(); },
-          },
-          {
-            label: "Clear",
-            icon: "backspace",
-            destructive: true,
-            disabled: !el.value,
-            action: () => triggerInputChange(el, ""),
-          },
-        );
-      }
+      items.push(
+        { label: "Open in Editor", icon: "edit", action: () => onFileAction?.("open", path) },
+        { label: "Open as Diff", icon: "difference", action: () => onFileAction?.("open-diff", path) },
+        { separator: true },
+        { label: "Copy File Path", icon: "content_copy", action: async () => await writeText(path) },
+        { label: "Copy File Name", icon: "file_copy", action: async () => await writeText(fileName) },
+      );
 
       if (items.length > 0) {
         setMenu({ x: e.clientX + 4, y: e.clientY + 2, items });
@@ -251,11 +190,4 @@ export function ContextMenuProvider({
   );
 }
 
-// ── Helper ────────────────────────────────────────────────────────────────────
-function triggerInputChange(el: HTMLInputElement | HTMLTextAreaElement, newValue: string) {
-  const nativeSetter =
-    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set ||
-    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-  nativeSetter?.call(el, newValue);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-}
+
