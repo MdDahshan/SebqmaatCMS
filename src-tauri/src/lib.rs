@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::fs;
-use std::process::Command;
-use std::path::Path;
 use std::sync::Mutex;
 use std::collections::HashMap;
+use std::path::Path;
+use tokio::fs;
+use tokio::process::Command;
 use lazy_static::lazy_static;
 use uuid::Uuid;
 use warp::Filter;
@@ -42,13 +42,17 @@ pub struct FileNode {
 
 fn read_dir_recursive(path: &str) -> Result<Vec<FileNode>, String> {
     let mut nodes = Vec::new();
-    let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
+    let entries = std::fs::read_dir(path).map_err(|e| e.to_string())?;
 
     for entry in entries {
         let entry = entry.map_err(|e| e.to_string())?;
         let path_buf = entry.path();
         let name = entry.file_name().into_string().unwrap_or_default();
         let is_dir = path_buf.is_dir();
+
+        if is_dir && (name == "node_modules" || name == ".git" || name == "target" || name == "dist") {
+            continue;
+        }
 
         let children = if is_dir {
             Some(read_dir_recursive(&path_buf.to_string_lossy())?)
@@ -69,23 +73,25 @@ fn read_dir_recursive(path: &str) -> Result<Vec<FileNode>, String> {
 }
 
 #[tauri::command]
-fn get_files(path: &str) -> Result<Vec<FileNode>, String> {
-    read_dir_recursive(path)
+async fn get_files(path: String) -> Result<Vec<FileNode>, String> {
+    tokio::task::spawn_blocking(move || read_dir_recursive(&path))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn read_file(path: &str) -> Result<String, String> {
-    fs::read_to_string(path).map_err(|e| e.to_string())
+async fn read_file(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn write_file(path: &str, content: &str) -> Result<(), String> {
-    fs::write(path, content).map_err(|e| e.to_string())
+async fn write_file(path: String, content: String) -> Result<(), String> {
+    fs::write(&path, content).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn upload_media(source_path: &str, dest_path: &str) -> Result<(), String> {
-    fs::copy(source_path, dest_path).map_err(|e| e.to_string())?;
+async fn upload_media(source_path: String, dest_path: String) -> Result<(), String> {
+    fs::copy(&source_path, &dest_path).await.map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -98,46 +104,57 @@ pub struct SearchResult {
 }
 
 #[tauri::command]
-fn search_files(path: &str, query: &str) -> Result<Vec<SearchResult>, String> {
-    let mut results = Vec::new();
+async fn search_files(path: String, query: String) -> Result<Vec<SearchResult>, String> {
     let query_lower = query.to_lowercase();
     
     if query_lower.is_empty() {
-        return Ok(results);
+        return Ok(Vec::new());
     }
     
-    fn search_dir(dir: &str, query_lower: &str, results: &mut Vec<SearchResult>) -> Result<(), String> {
-        let entries = fs::read_dir(dir).map_err(|e| e.to_string())?;
-        for entry in entries {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path_buf = entry.path();
-            if path_buf.is_dir() {
-                search_dir(&path_buf.to_string_lossy(), query_lower, results)?;
-            } else if path_buf.extension().and_then(|s| s.to_str()) == Some("json") {
-                if let Ok(content) = fs::read_to_string(&path_buf) {
-                    if let Ok(Value::Object(map)) = serde_json::from_str(&content) {
-                        let file_name = path_buf.file_name().unwrap_or_default().to_string_lossy().to_string();
-                        let file_path = path_buf.to_string_lossy().to_string();
-                        
-                        for (key, val) in map {
-                            let val_str = val.to_string();
-                            if val_str.to_lowercase().contains(query_lower) {
-                                results.push(SearchResult {
-                                    file_path: file_path.clone(),
-                                    file_name: file_name.clone(),
-                                    section: key.clone(),
-                                    snippet: format!("Match found in {}", key),
-                                });
+    // Spawn blocking to keep heavy JSON parsing off the UI and async executor threads
+    let results = tokio::task::spawn_blocking(move || {
+        let mut results = Vec::new();
+        fn search_dir(dir: &str, query_lower: &str, results: &mut Vec<SearchResult>) -> Result<(), String> {
+            let entries = std::fs::read_dir(dir).map_err(|e| e.to_string())?;
+            for entry in entries {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let path_buf = entry.path();
+                if path_buf.is_dir() {
+                    let dir_name = path_buf.file_name().unwrap_or_default().to_string_lossy();
+                    if dir_name == "node_modules" || dir_name == ".git" || dir_name == "target" || dir_name == "dist" {
+                        continue;
+                    }
+                    search_dir(&path_buf.to_string_lossy(), query_lower, results)?;
+                } else if path_buf.extension().and_then(|s| s.to_str()) == Some("json") {
+                    if let Ok(content) = std::fs::read_to_string(&path_buf) {
+                        if !content.to_lowercase().contains(query_lower) {
+                            continue; // Fast early exit without parsing JSON
+                        }
+                        if let Ok(Value::Object(map)) = serde_json::from_str(&content) {
+                            let file_name = path_buf.file_name().unwrap_or_default().to_string_lossy().to_string();
+                            let file_path = path_buf.to_string_lossy().to_string();
+                            
+                            for (key, val) in map {
+                                let val_str = val.to_string();
+                                if val_str.to_lowercase().contains(query_lower) {
+                                    results.push(SearchResult {
+                                        file_path: file_path.clone(),
+                                        file_name: file_name.clone(),
+                                        section: key.clone(),
+                                        snippet: format!("Match found in {}", key),
+                                    });
+                                }
                             }
                         }
                     }
                 }
             }
+            Ok(())
         }
-        Ok(())
-    }
+        
+        search_dir(&path, &query_lower, &mut results).map(|_| results)
+    }).await.map_err(|e| e.to_string())??;
     
-    search_dir(path, &query_lower, &mut results)?;
     Ok(results)
 }
 
@@ -170,11 +187,12 @@ pub struct GitBranchStatus {
 }
 
 #[tauri::command]
-fn get_git_status(path: &str) -> Result<GitChangesStatus, String> {
+async fn get_git_status(path: String) -> Result<GitChangesStatus, String> {
     let output = Command::new("git")
-        .current_dir(path)
+        .current_dir(&path)
         .args(["status", "-s"])
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -210,11 +228,12 @@ fn get_git_status(path: &str) -> Result<GitChangesStatus, String> {
 }
 
 #[tauri::command]
-fn get_git_branch_status(path: &str) -> Result<GitBranchStatus, String> {
+async fn get_git_branch_status(path: String) -> Result<GitBranchStatus, String> {
     let output = Command::new("git")
-        .current_dir(path)
+        .current_dir(&path)
         .args(["rev-list", "--left-right", "--count", "HEAD...@{u}"])
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -232,11 +251,12 @@ fn get_git_branch_status(path: &str) -> Result<GitBranchStatus, String> {
 }
 
 #[tauri::command]
-fn get_git_log(path: &str) -> Result<Vec<GitCommitLog>, String> {
+async fn get_git_log(path: String) -> Result<Vec<GitCommitLog>, String> {
     let output = Command::new("git")
-        .current_dir(path)
+        .current_dir(&path)
         .args(["log", "-n", "50", "--pretty=format:%H|%s|%an|%ad|%D", "--date=short"])
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -263,13 +283,13 @@ fn get_git_log(path: &str) -> Result<Vec<GitCommitLog>, String> {
 }
 
 #[tauri::command]
-fn git_add(path: &str, files: Vec<&str>) -> Result<(), String> {
+async fn git_add(path: String, files: Vec<String>) -> Result<(), String> {
     let mut cmd = Command::new("git");
-    cmd.current_dir(path).arg("add");
+    cmd.current_dir(&path).arg("add");
     for file in files {
         cmd.arg(file);
     }
-    let output = cmd.output().map_err(|e| e.to_string())?;
+    let output = cmd.output().await.map_err(|e| e.to_string())?;
 
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
@@ -279,13 +299,13 @@ fn git_add(path: &str, files: Vec<&str>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn git_unstage(path: &str, files: Vec<&str>) -> Result<(), String> {
+async fn git_unstage(path: String, files: Vec<String>) -> Result<(), String> {
     let mut cmd = Command::new("git");
-    cmd.current_dir(path).args(["reset", "HEAD", "--"]);
+    cmd.current_dir(&path).args(["reset", "HEAD", "--"]);
     for file in files {
         cmd.arg(file);
     }
-    let output = cmd.output().map_err(|e| e.to_string())?;
+    let output = cmd.output().await.map_err(|e| e.to_string())?;
 
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
@@ -297,9 +317,10 @@ fn git_unstage(path: &str, files: Vec<&str>) -> Result<(), String> {
 #[tauri::command]
 async fn git_commit(path: String, message: String) -> Result<(), String> {
     let output = Command::new("git")
-        .current_dir(path)
+        .current_dir(&path)
         .args(["commit", "-m", &message])
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -312,9 +333,10 @@ async fn git_commit(path: String, message: String) -> Result<(), String> {
 #[tauri::command]
 async fn git_push(path: String) -> Result<(), String> {
     let output = Command::new("git")
-        .current_dir(path)
+        .current_dir(&path)
         .args(["push"])
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -327,9 +349,10 @@ async fn git_push(path: String) -> Result<(), String> {
 #[tauri::command]
 async fn git_pull(path: String) -> Result<(), String> {
     let output = Command::new("git")
-        .current_dir(path)
+        .current_dir(&path)
         .args(["pull"])
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -340,7 +363,7 @@ async fn git_pull(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn git_show_file(path: &str, file: &str) -> Result<String, String> {
+async fn git_show_file(path: String, file: String) -> Result<String, String> {
     // Convert backslashes to forward slashes for git
     let normalized_file = file.replace("\\", "/");
     
@@ -348,9 +371,10 @@ fn git_show_file(path: &str, file: &str) -> Result<String, String> {
     // instead of the git root directory.
     let target = format!("HEAD:./{}", normalized_file);
     let output = Command::new("git")
-        .current_dir(path)
+        .current_dir(&path)
         .args(["show", &target])
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -361,12 +385,13 @@ fn git_show_file(path: &str, file: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn git_diff_file(path: &str, file: &str) -> Result<String, String> {
+async fn git_diff_file(path: String, file: String) -> Result<String, String> {
     let normalized_file = file.replace("\\", "/");
     let output = Command::new("git")
-        .current_dir(path)
+        .current_dir(&path)
         .args(["diff", "HEAD", "--", &normalized_file])
         .output()
+        .await
         .map_err(|e| e.to_string())?;
 
     if !output.status.success() {
@@ -380,7 +405,7 @@ fn find_file_recursively(dir: &Path, target_filename: &str, max_depth: usize) ->
     if max_depth == 0 {
         return None;
     }
-    if let Ok(entries) = fs::read_dir(dir) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -406,74 +431,77 @@ fn find_file_recursively(dir: &Path, target_filename: &str, max_depth: usize) ->
 }
 
 #[tauri::command]
-fn resolve_media_path(base_path: &str, parent_path: &str, media_path: &str) -> Result<String, String> {
-    println!("[MediaResolver] Started resolving path: {}", media_path);
-    // 0. Clean media path from quotes, backticks, or extra spaces
-    let clean_media_path = media_path.trim().trim_matches(|c| c == '"' || c == '\'' || c == '`');
-    println!("[MediaResolver] Cleaned path: {}", clean_media_path);
+async fn resolve_media_path(base_path: String, parent_path: String, media_path: String) -> Result<String, String> {
+    // Spawn blocking because of `std::fs` operations in `find_file_recursively`
+    tokio::task::spawn_blocking(move || {
+        println!("[MediaResolver] Started resolving path: {}", media_path);
+        // 0. Clean media path from quotes, backticks, or extra spaces
+        let clean_media_path = media_path.trim().trim_matches(|c| c == '"' || c == '\'' || c == '`');
+        println!("[MediaResolver] Cleaned path: {}", clean_media_path);
 
-    let base = Path::new(base_path);
-    let parent_file = Path::new(parent_path);
-    let parent_dir = if parent_file.is_file() {
-        parent_file.parent().unwrap_or(base)
-    } else {
-        parent_file
-    };
-    
-    // 1. Check if it's an absolute path on the user's system
-    let raw_path = Path::new(clean_media_path);
-    if raw_path.is_absolute() && raw_path.exists() && raw_path.is_file() {
-        if let Some(abs_path) = raw_path.to_str() {
-            println!("[MediaResolver] Found as absolute path: {}", abs_path);
-            return Ok(abs_path.to_string());
-        }
-    }
-    
-    // 2. Treat as relative path (strip leading slash so it doesn't resolve to root of filesystem)
-    let relative_media_path = clean_media_path.trim_start_matches('/');
-    
-    let mut possible_paths = vec![
-        parent_dir.join(relative_media_path),
-        base.join(relative_media_path),
-        base.join("public").join(relative_media_path),
-        base.join("src").join("assets").join(relative_media_path),
-    ];
-
-    if let Some(parent) = base.parent() {
-        possible_paths.push(parent.join(relative_media_path));
-        possible_paths.push(parent.join("public").join(relative_media_path));
-        possible_paths.push(parent.join("src").join("assets").join(relative_media_path));
-    }
-
-    for path in possible_paths {
-        if path.exists() && path.is_file() {
-            if let Some(abs_path) = path.to_str() {
-                println!("[MediaResolver] Found as relative path: {}", abs_path);
+        let base = Path::new(&base_path);
+        let parent_file = Path::new(&parent_path);
+        let parent_dir = if parent_file.is_file() {
+            parent_file.parent().unwrap_or(base)
+        } else {
+            parent_file
+        };
+        
+        // 1. Check if it's an absolute path on the user's system
+        let raw_path = Path::new(clean_media_path);
+        if raw_path.is_absolute() && raw_path.exists() && raw_path.is_file() {
+            if let Some(abs_path) = raw_path.to_str() {
+                println!("[MediaResolver] Found as absolute path: {}", abs_path);
                 return Ok(abs_path.to_string());
             }
         }
-    }
-    
-    println!("[MediaResolver] Falling back to recursive search for filename");
-    // 3. Smart fallback: Recursive search for the exact filename
-    if let Some(filename) = Path::new(&relative_media_path).file_name().and_then(|s| s.to_str()) {
-        // Try searching in the opened project base first (depth 5)
-        if let Some(found) = find_file_recursively(base, filename, 5) {
-            println!("[MediaResolver] Found recursively in base: {}", found);
-            return Ok(found);
-        }
         
-        // If not found, try searching in the parent directory of base (depth 4)
+        // 2. Treat as relative path (strip leading slash so it doesn't resolve to root of filesystem)
+        let relative_media_path = clean_media_path.trim_start_matches('/');
+        
+        let mut possible_paths = vec![
+            parent_dir.join(relative_media_path),
+            base.join(relative_media_path),
+            base.join("public").join(relative_media_path),
+            base.join("src").join("assets").join(relative_media_path),
+        ];
+
         if let Some(parent) = base.parent() {
-            if let Some(found) = find_file_recursively(parent, filename, 4) {
-                println!("[MediaResolver] Found recursively in parent: {}", found);
-                return Ok(found);
+            possible_paths.push(parent.join(relative_media_path));
+            possible_paths.push(parent.join("public").join(relative_media_path));
+            possible_paths.push(parent.join("src").join("assets").join(relative_media_path));
+        }
+
+        for path in possible_paths {
+            if path.exists() && path.is_file() {
+                if let Some(abs_path) = path.to_str() {
+                    println!("[MediaResolver] Found as relative path: {}", abs_path);
+                    return Ok(abs_path.to_string());
+                }
             }
         }
-    }
-    
-    println!("[MediaResolver] File not found anywhere!");
-    Err("Media file not found".to_string())
+        
+        println!("[MediaResolver] Falling back to recursive search for filename");
+        // 3. Smart fallback: Recursive search for the exact filename
+        if let Some(filename) = Path::new(&relative_media_path).file_name().and_then(|s| s.to_str()) {
+            // Try searching in the opened project base first (depth 5)
+            if let Some(found) = find_file_recursively(base, filename, 5) {
+                println!("[MediaResolver] Found recursively in base: {}", found);
+                return Ok(found);
+            }
+            
+            // If not found, try searching in the parent directory of base (depth 4)
+            if let Some(parent) = base.parent() {
+                if let Some(found) = find_file_recursively(parent, filename, 4) {
+                    println!("[MediaResolver] Found recursively in parent: {}", found);
+                    return Ok(found);
+                }
+            }
+        }
+        
+        println!("[MediaResolver] File not found anywhere!");
+        Err("Media file not found".to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

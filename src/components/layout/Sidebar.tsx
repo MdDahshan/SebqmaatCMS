@@ -143,8 +143,9 @@ export function Sidebar({ contentPath, onSelectFile, selectedFilePath, onNewFile
 
   return (
     <aside className="hidden md:flex flex-col w-[280px] shrink-0 h-full bg-background border-r border-border-low z-40">
-      <div className="h-14 flex items-center px-5 border-b border-white/5 shrink-0">
-        <span className="text-[14px] font-bold text-white tracking-wide">Sebqmaat CMS</span>
+      <div className="h-14 flex items-center gap-3 px-5 border-b border-white/5 shrink-0">
+        <img src="/logo.svg" alt="Logo" className="w-12 h-12" />
+        <span className="text-[18px] font-bold text-white tracking-wide">Sebqmaat CMS</span>
       </div>
 
       {/* Sidebar Tabs */}

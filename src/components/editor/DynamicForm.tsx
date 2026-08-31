@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm, Controller, FormProvider, useFormContext, useWatch } from "react-hook-form";
 import { MediaPreview } from "./MediaPreview";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -69,17 +69,6 @@ function RecursiveField({
   const type = typeof value;
   const fieldName = name ? capitalize(name.split(".").pop() || "") : "General Details";
 
-  const { formState: { dirtyFields } } = useFormContext();
-  const getIsDirty = (n: string) => {
-    let current: any = dirtyFields;
-    for (const part of n.split('.')) {
-      if (!current) return false;
-      current = current[part];
-    }
-    return current === true || (typeof current === 'object' && Object.keys(current).length > 0);
-  };
-  const isDirty = name ? getIsDirty(name) : false;
-
   const isMultiline = type === "string" && (value.length > 50 || value.includes("\n"));
   const isUrl = type === "string" && (value.startsWith("http://") || value.startsWith("https://"));
   const isMediaExtension = (val: any) => typeof val === 'string' && /\.(jpg|jpeg|png|gif|svg|webp|mp4|webm|ogg|ico|bmp)$/i.test(val.split('?')[0]);
@@ -105,104 +94,108 @@ function RecursiveField({
 
   if (type === "string") {
     return (
-      <div className="flex flex-col gap-2 relative">
-        <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
-          {fieldName}
-          <span className="text-[10px] font-normal text-text-muted">String</span>
-          {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
-        </label>
-        <Controller
-          name={name}
-          control={control}
-          render={({ field }) =>
-            isPath ? (
-              <div className="flex flex-col gap-2 w-full md:max-w-xl">
-                <div className="flex gap-2 w-full">
+      <Controller
+        name={name}
+        control={control}
+        render={({ field, fieldState }) => {
+          const isDirty = fieldState.isDirty;
+          return (
+            <div className="flex flex-col gap-2 relative">
+              <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
+                {fieldName}
+                <span className="text-[10px] font-normal text-text-muted">String</span>
+                {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
+              </label>
+              {isPath ? (
+                <div className="flex flex-col gap-2 w-full md:max-w-xl">
+                  <div className="flex gap-2 w-full">
+                    <Input
+                      {...field}
+                      type="text"
+                      className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full backdrop-blur-sm ${
+                        isDirty 
+                          ? "border-primary hover:border-primary/80 focus:border-primary" 
+                          : "border-white/10 hover:border-white/20 focus:border-white/40"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const selected = await open({ multiple: false });
+                        if (selected && typeof selected === "string") {
+                          field.onChange(selected);
+                        }
+                      }}
+                      className="shrink-0 px-3 h-[36px] rounded-md bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors flex items-center justify-center"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">folder</span>
+                    </button>
+                  </div>
+                  {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={explicitMediaField} />}
+                </div>
+              ) : isMultiline ? (
+                <AutoResizeTextarea
+                  {...field}
+                  className={`bg-transparent border rounded-md px-3 py-2 text-[13px] text-white focus:outline-none transition-all min-h-[36px] w-full md:max-w-xl ${
+                    isDirty 
+                      ? "border-primary hover:border-primary/80 focus:border-primary" 
+                      : "border-white/10 hover:border-white/20 focus:border-white/40"
+                  }`}
+                />
+              ) : isUrl ? (
+                <div className="flex flex-col gap-2 w-full md:max-w-xl">
                   <Input
                     {...field}
                     type="text"
-                    className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full backdrop-blur-sm ${
+                    className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full ${
                       isDirty 
                         ? "border-primary hover:border-primary/80 focus:border-primary" 
                         : "border-white/10 hover:border-white/20 focus:border-white/40"
                     }`}
                   />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const selected = await open({ multiple: false });
-                      if (selected && typeof selected === "string") {
-                        field.onChange(selected);
-                      }
-                    }}
-                    className="shrink-0 px-3 h-[36px] rounded-md bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors flex items-center justify-center"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">folder</span>
-                  </button>
+                  {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={explicitMediaField} />}
                 </div>
-                {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={explicitMediaField} />}
-              </div>
-            ) : isMultiline ? (
-              <AutoResizeTextarea
-                {...field}
-                className={`bg-transparent border rounded-md px-3 py-2 text-[13px] text-white focus:outline-none transition-all min-h-[36px] w-full md:max-w-xl ${
-                  isDirty 
-                    ? "border-primary hover:border-primary/80 focus:border-primary" 
-                    : "border-white/10 hover:border-white/20 focus:border-white/40"
-                }`}
-              />
-            ) : isUrl ? (
-              <div className="flex flex-col gap-2 w-full md:max-w-xl">
-                <Input
-                  {...field}
-                  type="text"
-                  className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full ${
-                    isDirty 
-                      ? "border-primary hover:border-primary/80 focus:border-primary" 
-                      : "border-white/10 hover:border-white/20 focus:border-white/40"
-                  }`}
-                />
-                {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={explicitMediaField} />}
-              </div>
-            ) : (
-              <div className="flex gap-2 w-full md:max-w-xl items-center">
-                <Input
-                  {...field}
-                  type="text"
-                  className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full ${
-                    isDirty 
-                      ? "border-primary hover:border-primary/80 focus:border-primary" 
-                      : "border-white/10 hover:border-white/20 focus:border-white/40"
-                  }`}
-                />
-                {IconComponent && (
-                  <div className="shrink-0 p-1.5 bg-white/5 border border-white/10 rounded-md flex items-center justify-center">
-                    <IconComponent className="w-5 h-5 text-white/80" />
-                  </div>
-                )}
-              </div>
-            )
-          }
-        />
-      </div>
+              ) : (
+                <div className="flex gap-2 w-full md:max-w-xl items-center">
+                  <Input
+                    {...field}
+                    type="text"
+                    className={`bg-transparent h-[36px] px-3 text-[13px] text-white focus:outline-none transition-all w-full ${
+                      isDirty 
+                        ? "border-primary hover:border-primary/80 focus:border-primary" 
+                        : "border-white/10 hover:border-white/20 focus:border-white/40"
+                    }`}
+                  />
+                  {IconComponent && (
+                    <div className="shrink-0 p-1.5 bg-white/5 border border-white/10 rounded-md flex items-center justify-center">
+                      <IconComponent className="w-5 h-5 text-white/80" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        }}
+      />
     );
   }
 
   if (type === "boolean") {
     return (
-      <div className="flex flex-col gap-2">
-        <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
-          {fieldName}
-          <span className="text-[10px] font-normal text-text-muted">Boolean</span>
-          {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
-        </label>
-        <div className="flex items-center h-[36px] w-full md:max-w-xl">
-          <div className="relative inline-block w-9 mr-2 align-middle select-none transition duration-200 ease-in">
-            <Controller
-              name={name}
-              control={control}
-              render={({ field }) => (
-                <>
+      <Controller
+        name={name}
+        control={control}
+        render={({ field, fieldState }) => {
+          const isDirty = fieldState.isDirty;
+          return (
+            <div className="flex flex-col gap-2">
+              <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
+                {fieldName}
+                <span className="text-[10px] font-normal text-text-muted">Boolean</span>
+                {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
+              </label>
+              <div className="flex items-center h-[36px] w-full md:max-w-xl">
+                <div className="relative inline-block w-9 mr-2 align-middle select-none transition duration-200 ease-in">
                   <input
                     type="checkbox"
                     checked={field.value}
@@ -216,26 +209,28 @@ function RecursiveField({
                   >
                     Toggle
                   </label>
-                </>
-              )}
-            />
-          </div>
-        </div>
-      </div>
+                </div>
+              </div>
+            </div>
+          );
+        }}
+      />
     );
   }
 
   if (type === "number") {
     return (
-      <div className="flex flex-col gap-2">
-        <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
-          {fieldName}
-          {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
-        </label>
-        <Controller
-          name={name}
-          control={control}
-          render={({ field }) => (
+      <Controller
+        name={name}
+        control={control}
+        render={({ field, fieldState }) => {
+          const isDirty = fieldState.isDirty;
+          return (
+            <div className="flex flex-col gap-2">
+              <label className="text-[13px] font-medium text-text-primary flex items-center gap-2">
+                {fieldName}
+                {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
+              </label>
               <Input
                 type="text"
                 {...field}
@@ -245,9 +240,10 @@ function RecursiveField({
                     : "border-white/10 hover:border-white/20 focus:border-white/40"
                 }`}
               />
-          )}
-        />
-      </div>
+            </div>
+          );
+        }}
+      />
     );
   }
 
@@ -369,41 +365,57 @@ export function DynamicForm({ initialData, draftData, activeTab, onSave, onDisca
   });
   const { control, handleSubmit, reset, watch } = methods;
 
-  const currentValues = watch();
+  const [actualIsDirty, setActualIsDirty] = useState(!!draftData && JSON.stringify(initialData) !== JSON.stringify(draftData));
 
-  const lastDraftStrRef = useRef<string | null>(null);
+  const lastDraftStrRef = useRef<string | null>(draftData ? JSON.stringify(draftData) : null);
 
   useEffect(() => {
-    if (!onDraftUpdate) return;
+    // Check initially in case draftData wasn't provided but values are dirty
     const strInitial = JSON.stringify(initialData);
-    const strCurrent = JSON.stringify(currentValues);
-    if (strInitial !== strCurrent) {
-      if (lastDraftStrRef.current !== strCurrent) {
-        lastDraftStrRef.current = strCurrent;
-        onDraftUpdate(currentValues);
-      }
-    } else {
-      if (lastDraftStrRef.current !== undefined) {
-        lastDraftStrRef.current = undefined as any;
-        onDraftUpdate(undefined);
-      }
-    }
-  }, [currentValues, initialData, onDraftUpdate]);
+    const strCurrent = JSON.stringify(methods.getValues());
+    const isDirtyNow = strInitial !== strCurrent;
+    setActualIsDirty(isDirtyNow);
+    
+    let timeoutId: any;
+    const subscription = watch((value) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const strCurrentVal = JSON.stringify(value);
+        const isDirtyVal = strInitial !== strCurrentVal;
+        
+        setActualIsDirty(isDirtyVal);
+
+        if (!onDraftUpdate) return;
+        if (isDirtyVal) {
+          if (lastDraftStrRef.current !== strCurrentVal) {
+            lastDraftStrRef.current = strCurrentVal;
+            onDraftUpdate(value);
+          }
+        } else {
+          if (lastDraftStrRef.current !== undefined) {
+            lastDraftStrRef.current = undefined as any;
+            onDraftUpdate(undefined);
+          }
+        }
+      }, 300); // 300ms debounce
+    });
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeoutId);
+    };
+  }, [watch, initialData, onDraftUpdate, methods]);
 
   const onSubmit = (data: any) => {
     onSave(data);
     reset(data);
+    setActualIsDirty(false);
   };
 
   const handleDiscard = () => {
     reset(initialData);
+    setActualIsDirty(false);
     onDiscard();
   };
-
-  // We consider the form dirty if the current values are different from the original file data.
-  // react-hook-form's isDirty compares against defaultValues, which could be draftData.
-  // So we calculate actual dirty state manually.
-  const actualIsDirty = JSON.stringify(initialData) !== JSON.stringify(currentValues);
 
   if (!initialData || Object.keys(initialData).length === 0) {
     return <p className="text-text-muted">No editable data found.</p>;

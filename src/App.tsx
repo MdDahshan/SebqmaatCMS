@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { load } from "@tauri-apps/plugin-store";
@@ -49,16 +49,21 @@ function AppInner() {
     loadRecent();
   }, []);
 
+  const handleSelectFileRef = useRef<any>(null);
+  
+  useEffect(() => {
+    handleSelectFileRef.current = handleSelectFile;
+  });
+
   // Listen for context menu file actions
   useEffect(() => {
     const handler = (e: Event) => {
       const { action, path } = (e as CustomEvent).detail;
-      if (action === "open") handleSelectFile(path, undefined, 'editor');
-      if (action === "open-diff") handleSelectFile(path, undefined, 'diff');
+      if (action === "open") handleSelectFileRef.current?.(path, undefined, 'editor');
+      if (action === "open-diff") handleSelectFileRef.current?.(path, undefined, 'diff');
     };
     window.addEventListener("cms:file-action", handler);
     return () => window.removeEventListener("cms:file-action", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSelectFile = async (path: string, section?: string, mode?: 'editor' | 'diff') => {
