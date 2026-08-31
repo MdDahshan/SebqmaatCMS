@@ -1,16 +1,86 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useState, useRef, useEffect } from 'react';
 
-export function TitleBar({ projectName }: { projectName?: string }) {
+function MenuDropdown({ label, items }: { label: string, items: { label: string, onClick: () => void, shortcut?: string, divider?: boolean }[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative h-full flex items-center" ref={ref}>
+      <button 
+        data-tauri-drag-region="false"
+        className={`h-full px-2.5 text-[11.5px] hover:bg-white/10 transition-colors flex items-center rounded-sm mx-0.5 ${isOpen ? 'bg-white/10 text-white' : 'text-text-muted'}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {label}
+      </button>
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-48 bg-[#1c1c1f] border border-white/10 shadow-2xl p-1 z-[100] rounded-md overflow-hidden">
+          {items.map((item, idx) => item.divider ? (
+            <div key={idx} className="h-[1px] bg-white/10 my-1 mx-2" />
+          ) : (
+            <button
+              key={idx}
+              className="w-full text-left px-3 py-1 text-[11.5px] text-text-primary hover:bg-white/10 rounded-sm flex justify-between items-center transition-colors"
+              onClick={() => {
+                item.onClick();
+                setIsOpen(false);
+              }}
+            >
+              <span>{item.label}</span>
+              {item.shortcut && <span className="opacity-50 text-[10px] tracking-wider">{item.shortcut}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function TitleBar({ 
+  projectName,
+  onOpenFolder,
+  onCloseFolder
+}: { 
+  projectName?: string;
+  onOpenFolder?: () => void;
+  onCloseFolder?: () => void;
+}) {
   const appWindow = getCurrentWindow();
 
   return (
     <div data-tauri-drag-region className="h-[30px] flex justify-between items-center bg-transparent border-b border-border-low shrink-0 select-none relative z-50">
-      {/* Left Spacer */}
-      <div data-tauri-drag-region className="flex items-center px-4 w-[138px] pointer-events-none relative z-10">
+      {/* Left Menu */}
+      <div className="flex items-center h-full relative z-10 pl-2">
+        <MenuDropdown 
+          label="File" 
+          items={[
+            { label: 'Open Folder...', onClick: () => onOpenFolder?.(), shortcut: 'Ctrl+O' },
+            { label: 'Close Folder', onClick: () => onCloseFolder?.() },
+            { divider: true, label: '', onClick: () => {} },
+            { label: 'Exit', onClick: () => appWindow.close(), shortcut: 'Alt+F4' },
+          ]} 
+        />
+        <MenuDropdown 
+          label="Help" 
+          items={[
+            { label: 'About SebqmaatCMS', onClick: () => alert('SebqmaatCMS v0.1.0\nCreated by Dash') },
+          ]} 
+        />
       </div>
       
       {/* Center Title (Project Name) */}
-      <div data-tauri-drag-region className="flex-1 flex justify-center items-center pointer-events-none relative z-10">
+      <div data-tauri-drag-region className="flex-1 flex justify-center items-center pointer-events-none relative z-10 absolute inset-0">
         {projectName && (
           <span data-tauri-drag-region className="text-[12px] text-text-muted font-medium tracking-wide opacity-80">{projectName}</span>
         )}

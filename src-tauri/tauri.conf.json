@@ -25,7 +25,16 @@
       "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' asset: http://asset.localhost http: https: data: blob:;",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**", "**/*"]
+        "scope": [
+          "**",
+          "**/*",
+          "$HOME/**",
+          "$DOCUMENT/**",
+          "$DOWNLOAD/**",
+          "$PICTURE/**",
+          "$VIDEO/**",
+          "$DESKTOP/**"
+        ]
       }
     }
   },

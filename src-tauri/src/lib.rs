@@ -3,6 +3,34 @@ use serde_json::Value;
 use std::fs;
 use std::process::Command;
 use std::path::Path;
+use std::sync::Mutex;
+use std::collections::HashMap;
+use lazy_static::lazy_static;
+use uuid::Uuid;
+use warp::Filter;
+
+lazy_static! {
+    static ref MEDIA_SERVER: Mutex<Option<(u16, String)>> = Mutex::new(None);
+}
+
+#[derive(Serialize)]
+pub struct MediaServerInfo {
+    pub port: u16,
+    pub token: String,
+}
+
+#[tauri::command]
+fn get_media_server_info() -> Result<MediaServerInfo, String> {
+    let info = MEDIA_SERVER.lock().unwrap();
+    if let Some((port, token)) = &*info {
+        Ok(MediaServerInfo {
+            port: *port,
+            token: token.clone(),
+        })
+    } else {
+        Err("Media server not initialized".to_string())
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct FileNode {
@@ -379,8 +407,10 @@ fn find_file_recursively(dir: &Path, target_filename: &str, max_depth: usize) ->
 
 #[tauri::command]
 fn resolve_media_path(base_path: &str, parent_path: &str, media_path: &str) -> Result<String, String> {
+    println!("[MediaResolver] Started resolving path: {}", media_path);
     // 0. Clean media path from quotes, backticks, or extra spaces
     let clean_media_path = media_path.trim().trim_matches(|c| c == '"' || c == '\'' || c == '`');
+    println!("[MediaResolver] Cleaned path: {}", clean_media_path);
 
     let base = Path::new(base_path);
     let parent_file = Path::new(parent_path);
@@ -394,6 +424,7 @@ fn resolve_media_path(base_path: &str, parent_path: &str, media_path: &str) -> R
     let raw_path = Path::new(clean_media_path);
     if raw_path.is_absolute() && raw_path.exists() && raw_path.is_file() {
         if let Some(abs_path) = raw_path.to_str() {
+            println!("[MediaResolver] Found as absolute path: {}", abs_path);
             return Ok(abs_path.to_string());
         }
     }
@@ -417,32 +448,81 @@ fn resolve_media_path(base_path: &str, parent_path: &str, media_path: &str) -> R
     for path in possible_paths {
         if path.exists() && path.is_file() {
             if let Some(abs_path) = path.to_str() {
+                println!("[MediaResolver] Found as relative path: {}", abs_path);
                 return Ok(abs_path.to_string());
             }
         }
     }
     
+    println!("[MediaResolver] Falling back to recursive search for filename");
     // 3. Smart fallback: Recursive search for the exact filename
     if let Some(filename) = Path::new(&relative_media_path).file_name().and_then(|s| s.to_str()) {
         // Try searching in the opened project base first (depth 5)
         if let Some(found) = find_file_recursively(base, filename, 5) {
+            println!("[MediaResolver] Found recursively in base: {}", found);
             return Ok(found);
         }
         
         // If not found, try searching in the parent directory of base (depth 4)
         if let Some(parent) = base.parent() {
             if let Some(found) = find_file_recursively(parent, filename, 4) {
+                println!("[MediaResolver] Found recursively in parent: {}", found);
                 return Ok(found);
             }
         }
     }
     
+    println!("[MediaResolver] File not found anywhere!");
     Err("Media file not found".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+
+    let security_token = Uuid::new_v4().to_string();
+    let token_clone = security_token.clone();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            let token_filter = warp::query::<HashMap<String, String>>()
+                .map(move |q: HashMap<String, String>| {
+                    q.get("token") == Some(&token_clone)
+                })
+                .and_then(|valid: bool| async move {
+                    if valid {
+                        Ok(())
+                    } else {
+                        Err(warp::reject::not_found())
+                    }
+                });
+
+            #[cfg(target_os = "windows")]
+            let file_server = warp::fs::dir("C:\\");
+            #[cfg(not(target_os = "windows"))]
+            let file_server = warp::fs::dir("/");
+
+            let route = warp::any()
+                .and(token_filter)
+                .and(file_server)
+                .map(|_, file| file)
+                .with(warp::cors().allow_any_origin());
+
+            let (addr, server) = warp::serve(route).bind_ephemeral(([127, 0, 0, 1], 0));
+            
+            {
+                let mut info = MEDIA_SERVER.lock().unwrap();
+                *info = Some((addr.port(), security_token));
+            }
+            
+            server.await;
+        });
+    });
+
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -462,7 +542,8 @@ pub fn run() {
             git_pull,
             git_show_file,
             git_diff_file,
-            resolve_media_path
+            resolve_media_path,
+            get_media_server_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

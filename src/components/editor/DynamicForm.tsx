@@ -82,32 +82,17 @@ function RecursiveField({
 
   const isMultiline = type === "string" && (value.length > 50 || value.includes("\n"));
   const isUrl = type === "string" && (value.startsWith("http://") || value.startsWith("https://"));
-
-  const isMediaExtension = (val: string) => /\.(jpg|jpeg|png|gif|svg|webp|mp4|webm|ogg|ico|bmp)$/i.test(val.split('?')[0]);
-
-
-  const hasPathSemantics = name.toLowerCase().includes("image") || 
-                           name.toLowerCase().includes("path") || 
-                           name.toLowerCase().includes("file") || 
-                           name.toLowerCase().includes("video");
-
-  const hasMediaSemantics = name.toLowerCase().includes("image") || 
-                            name.toLowerCase().includes("icon") || 
-                            name.toLowerCase().includes("video") || 
-                            name.toLowerCase().includes("cover") || 
-                            name.toLowerCase().includes("thumbnail") ||
-                            name.toLowerCase().includes("media") ||
-                            name.toLowerCase().includes("logo");
+  const isMediaExtension = (val: any) => typeof val === 'string' && /\.(jpg|jpeg|png|gif|svg|webp|mp4|webm|ogg|ico|bmp)$/i.test(val.split('?')[0]);
 
   const isPath = type === "string" && !isUrl && (
     value.startsWith("/") || 
     value.startsWith("./") || 
     value.startsWith("../") ||
-    isMediaExtension(value) ||
-    hasPathSemantics
+    isMediaExtension(value)
   );
 
   const shouldTryPreview = type === "string" && value.trim() !== "" && (isUrl || isPath);
+  const explicitMediaField = isMediaExtension(value);
 
   const getIconComponent = (val: string) => {
     if (!val || typeof val !== 'string') return null;
@@ -155,7 +140,7 @@ function RecursiveField({
                     <span className="material-symbols-outlined text-[18px]">folder</span>
                   </button>
                 </div>
-                {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={hasMediaSemantics} />}
+                {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={explicitMediaField} />}
               </div>
             ) : isMultiline ? (
               <AutoResizeTextarea
@@ -177,7 +162,7 @@ function RecursiveField({
                       : "border-white/10 hover:border-white/20 focus:border-white/40"
                   }`}
                 />
-                {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={hasMediaSemantics} />}
+                {shouldTryPreview && <MediaPreview src={field.value} contentPath={contentPath} activePath={activePath} explicitMediaField={explicitMediaField} />}
               </div>
             ) : (
               <div className="flex gap-2 w-full md:max-w-xl items-center">

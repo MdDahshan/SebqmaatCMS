@@ -173,11 +173,17 @@ function AppInner() {
     toast.info("New file created! (Placeholder - Implement backend later)");
   };
 
-  const projectName = contentPath ? contentPath.split(/[/\\]/).filter(Boolean).slice(-2, -1)[0] : "Sebqmaat CMS";
-
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
-      <TitleBar projectName={projectName || "Sebqmaat CMS"} />
+      <TitleBar 
+        projectName={contentPath ? contentPath.split(/[/\\]/).pop() : undefined} 
+        onOpenFolder={handlePickFolder}
+        onCloseFolder={() => {
+          setContentPath("");
+          setActivePath(null);
+          setFileData(null);
+        }}
+      />
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar 
           contentPath={contentPath} 

@@ -82,6 +82,22 @@ body, html, #root {
   overflow: hidden;
 }
 
+/* Fix WebKitGTK buggy native video controls */
+video::-webkit-media-controls-overlay-play-button {
+  display: none !important;
+}
+
+/* Fix native fullscreen black screen */
+video:fullscreen,
+video:-webkit-full-screen {
+  max-width: none !important;
+  max-height: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  background-color: black !important;
+}
+
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
