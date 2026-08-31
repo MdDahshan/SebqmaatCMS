@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface ContextMenuItem {
