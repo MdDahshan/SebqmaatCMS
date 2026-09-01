@@ -1,6 +1,7 @@
 # Sebqmaat CMS
 
 Sebqmaat CMS is a fast, lightweight, and local-first Content Management System built with **Tauri**, **React**, and **TypeScript**. It is designed to manage JSON and Markdown data files natively on your filesystem, providing a dynamic visual editor with built-in Git version control.
+<img width="1920" height="1050" alt="Screenshot From 2026-09-01 20-50-47" src="https://github.com/user-attachments/assets/3c3b492a-905e-4078-a8c0-7a4167182653" />
 
 ## Features
 
