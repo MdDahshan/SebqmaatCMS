@@ -510,22 +510,14 @@ async fn scan_ai_clis() -> Result<Vec<String>, String> {
     let clis = vec![
         "kiro-cli", "cloudcode", "claude", "gemini-cli", "antigravity-cli", 
         "codex", "copilot", "gh-copilot", "aider", "gpt-cli", "chatgpt-cli", 
-        "plandex", "sweep", "cursor", "continue", "devika"
+        "plandex", "sweep", "cursor", "continue", "devika", 
+        "opencode", "goose", "openhands", "pi", "grok", "cline"
     ];
     
     for cli in clis {
-        let is_windows = cfg!(target_os = "windows");
-        let checker = if is_windows { "where" } else { "which" };
-        
-        let output = std::process::Command::new(checker)
-            .arg(cli)
-            .output();
-            
-        if let Ok(out) = output {
-            if out.status.success() {
-                if !available.contains(&cli.to_string()) {
-                    available.push(cli.to_string());
-                }
+        if which::which(cli).is_ok() {
+            if !available.contains(&cli.to_string()) {
+                available.push(cli.to_string());
             }
         }
     }
