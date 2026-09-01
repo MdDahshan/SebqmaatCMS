@@ -17,6 +17,34 @@ interface ChatMessage {
   content: string;
 }
 
+const TypewriterMarkdown = ({ content, animate, components }: { content: string, animate: boolean, components: any }) => {
+  const [displayedContent, setDisplayedContent] = useState(animate ? '' : content);
+  
+  useEffect(() => {
+    if (!animate) {
+      setDisplayedContent(content);
+      return;
+    }
+    
+    let i = 0;
+    setDisplayedContent('');
+    
+    const intervalId = setInterval(() => {
+      setDisplayedContent(content.slice(0, i));
+      // Adaptive speed: faster for longer content, but at least 2 chars per tick
+      i += Math.max(2, Math.floor(content.length / 80)); 
+      if (i > content.length) {
+        setDisplayedContent(content);
+        clearInterval(intervalId);
+      }
+    }, 15);
+    
+    return () => clearInterval(intervalId);
+  }, [content, animate]);
+
+  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{displayedContent}</ReactMarkdown>;
+};
+
 export function AISidebar({ isOpen, onClose, fileData, onApplyChanges }: AISidebarProps) {
   const [availableCLIs, setAvailableCLIs] = useState<string[]>([]);
   const [selectedCLI, setSelectedCLI] = useState<string | null>(null);
@@ -296,8 +324,9 @@ export function AISidebar({ isOpen, onClose, fileData, onApplyChanges }: AISideb
                     {msg.role === 'user' ? (
                       <span className="whitespace-pre-wrap font-sans">{msg.content}</span>
                     ) : (
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
+                      <TypewriterMarkdown 
+                        animate={idx === chatHistory.length - 1}
+                        content={msg.content}
                         components={{
                           ul: ({node, ...props}) => <ul className="list-disc list-outside ml-4 mb-2" dir="auto" {...props} />,
                           ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-4 mb-2" dir="auto" {...props} />,
@@ -335,9 +364,7 @@ export function AISidebar({ isOpen, onClose, fileData, onApplyChanges }: AISideb
                           a: ({node, ...props}) => <a className="text-primary hover:underline" {...props} />,
                           strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />
                         }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
+                      />
                     )}
                   </div>
                 </div>
