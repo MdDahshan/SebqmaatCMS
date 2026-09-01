@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { load } from "@tauri-apps/plugin-store";
+import { AnimatePresence } from "framer-motion";
 import "./App.css";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TitleBar } from "./components/layout/TitleBar";
+import { AISidebar } from "./components/layout/AISidebar";
 import { DynamicForm } from "./components/editor/DynamicForm";
 import { GitDiffEditor } from "./components/editor/GitDiffEditor";
 import { parseFileContent, stringifyFileContent } from "./utils/parser";
@@ -35,6 +37,7 @@ function AppInner() {
   const [error, setError] = useState<string | null>(null);
   const [recentProjects, setRecentProjects] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<Record<string, any>>({});
+  const [isAIOpen, setIsAIOpen] = useState(false);
 
   useEffect(() => {
     async function loadRecent() {
@@ -348,6 +351,17 @@ function AppInner() {
         })()}
 
         <main className="flex-1 flex flex-col min-w-0 relative overflow-hidden bg-background">
+          {/* AI Sidebar Toggle Button */}
+          <div className="absolute top-2 right-2 z-50">
+            <button
+              onClick={() => setIsAIOpen(!isAIOpen)}
+              className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-md text-primary transition-colors flex items-center gap-1.5 justify-center shadow-md backdrop-blur-md text-[13px] font-semibold tracking-wide"
+              title={isAIOpen ? "Close AI Assistant" : "Open AI Assistant"}
+            >
+              AI Assistant
+            </button>
+          </div>
+
           {/* Fixed Background Layer */}
           <div 
             className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
@@ -502,6 +516,17 @@ function AppInner() {
           </div>
           <div id="footer-portal-root" className="absolute bottom-0 left-0 w-full z-50 pointer-events-none" />
         </main>
+
+        <AnimatePresence>
+          {isAIOpen && (
+            <AISidebar 
+              isOpen={isAIOpen} 
+              onClose={() => setIsAIOpen(false)} 
+              fileData={fileData}
+              onApplyChanges={handleSave}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

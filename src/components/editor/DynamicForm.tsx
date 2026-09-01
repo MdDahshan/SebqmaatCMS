@@ -370,6 +370,10 @@ export function DynamicForm({ initialData, draftData, activeTab, onSave, onDisca
   const lastDraftStrRef = useRef<string | null>(draftData ? JSON.stringify(draftData) : null);
 
   useEffect(() => {
+    reset(draftData || initialData);
+  }, [initialData, draftData, reset]);
+
+  useEffect(() => {
     // Check initially in case draftData wasn't provided but values are dirty
     const strInitial = JSON.stringify(initialData);
     const strCurrent = JSON.stringify(methods.getValues());

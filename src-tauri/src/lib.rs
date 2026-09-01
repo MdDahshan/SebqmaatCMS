@@ -504,6 +504,89 @@ async fn resolve_media_path(base_path: String, parent_path: String, media_path: 
     }).await.map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn scan_ai_clis() -> Result<Vec<String>, String> {
+    let mut available = Vec::new();
+    let clis = vec![
+        "kiro-cli", "cloudcode", "claude", "gemini-cli", "antigravity-cli", 
+        "codex", "copilot", "gh-copilot", "aider", "gpt-cli", "chatgpt-cli", 
+        "plandex", "sweep", "cursor", "continue", "devika"
+    ];
+    
+    for cli in clis {
+        let is_windows = cfg!(target_os = "windows");
+        let checker = if is_windows { "where" } else { "which" };
+        
+        let output = std::process::Command::new(checker)
+            .arg(cli)
+            .output();
+            
+        if let Ok(out) = output {
+            if out.status.success() {
+                if !available.contains(&cli.to_string()) {
+                    available.push(cli.to_string());
+                }
+            }
+        }
+    }
+    
+    Ok(available)
+}
+
+#[tauri::command]
+async fn chat_with_ai(cli_name: String, prompt: String, file_content: String) -> Result<String, String> {
+    use std::io::Write;
+    
+    let mut cmd = std::process::Command::new(&cli_name);
+    
+    let system_instruction = "You are an AI assistant built into a CMS editor. The user provides a JSON representation of the current file context.\n\
+    You can have a conversation with the user and answer their questions normally in markdown.\n\
+    If the user asks you to edit, change, or update the file, you MUST output a JSON object containing ONLY the specific fields to be updated. This partial JSON will be deep-merged into the existing file.\n\
+    IMPORTANT: You must maintain the exact same JSON structure/nesting as the provided context! For example, if modifying a markdown file's frontmatter, your JSON MUST wrap the fields in \"_frontmatter\": { ... }.\n\
+    Enclose this partial JSON data in a ```json code block.\n\
+    When outputting JSON, ensure it is 100% valid JSON. Do not use double double-quotes (like \"\"value\"\"). Use standard formatting.";
+    
+    let context_only = format!("{}\n\nContext (Current file data):\n{}", system_instruction, file_content);
+    let full_input = format!("{}\n\nContext (Current file data):\n{}\n\nUser Request:\n{}", system_instruction, file_content, prompt);
+    let mut stdin_content = context_only.clone();
+
+    match cli_name.as_str() {
+        "kiro-cli" => {
+            cmd.arg("chat").arg("--no-interactive").arg("--trust-all-tools");
+            stdin_content = full_input;
+        }
+        "codex" => {
+            cmd.arg("exec");
+            stdin_content = full_input;
+        }
+        "cloudcode" | "claude" | "gemini-cli" | "antigravity-cli" => {
+            cmd.arg("-p").arg(&prompt);
+        }
+        _ => {
+            cmd.arg(&prompt);
+        }
+    }
+    
+    cmd.stdin(std::process::Stdio::piped())
+       .stdout(std::process::Stdio::piped())
+       .stderr(std::process::Stdio::piped());
+
+    let mut child = cmd.spawn()
+        .map_err(|e| format!("Failed to start {}: {}", cli_name, e))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(stdin_content.as_bytes()).map_err(|e| e.to_string())?;
+    }
+
+    let output = child.wait_with_output().map_err(|e| e.to_string())?;
+    
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).into_owned())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "linux")]
@@ -571,7 +654,9 @@ pub fn run() {
             git_show_file,
             git_diff_file,
             resolve_media_path,
-            get_media_server_info
+            get_media_server_info,
+            scan_ai_clis,
+            chat_with_ai
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
