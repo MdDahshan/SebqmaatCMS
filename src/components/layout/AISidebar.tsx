@@ -316,53 +316,62 @@ export function AISidebar({ isOpen, onClose, fileData, onApplyChanges }: AISideb
                     {msg.role === 'user' ? 'You' : selectedCLI}
                   </span>
                   
-                  <div className={`text-[13px] leading-relaxed break-words ${
+                  <div className={`text-[13.5px] leading-relaxed break-words font-sans ${
                     msg.role === 'user' 
                       ? 'px-3.5 py-2.5 rounded-2xl rounded-tr-sm bg-white/10 text-white shadow-sm border border-white/5' 
                       : 'text-white/90 w-full pt-1'
                   }`}>
                     {msg.role === 'user' ? (
-                      <span className="whitespace-pre-wrap font-sans">{msg.content}</span>
+                      <span className="whitespace-pre-wrap">{msg.content}</span>
                     ) : (
                       <TypewriterMarkdown 
                         animate={idx === chatHistory.length - 1}
                         content={msg.content}
                         components={{
-                          ul: ({node, ...props}) => <ul className="list-disc list-outside ml-4 mb-2" dir="auto" {...props} />,
-                          ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-4 mb-2" dir="auto" {...props} />,
-                          li: ({node, ...props}) => <li className="mb-1" dir="auto" {...props} />,
-                          p: ({node, ...props}) => <p className="mb-2 last:mb-0" dir="auto" {...props} />,
+                          h1: ({node, ...props}: any) => <h1 className="text-[18px] font-bold mt-5 mb-3 text-white border-b border-white/10 pb-1.5" dir="auto" {...props} />,
+                          h2: ({node, ...props}: any) => <h2 className="text-[16px] font-semibold mt-4 mb-2 text-white/95" dir="auto" {...props} />,
+                          h3: ({node, ...props}: any) => <h3 className="text-[14.5px] font-semibold mt-3 mb-2 text-white/90" dir="auto" {...props} />,
+                          h4: ({node, ...props}: any) => <h4 className="text-[13.5px] font-semibold mt-3 mb-1 text-white/80" dir="auto" {...props} />,
+                          p: ({node, ...props}: any) => <p className="mb-3 last:mb-0 leading-[1.6]" dir="auto" {...props} />,
+                          ul: ({node, ...props}: any) => <ul className="list-disc list-outside ml-5 mb-3 space-y-1" dir="auto" {...props} />,
+                          ol: ({node, ...props}: any) => <ol className="list-decimal list-outside ml-5 mb-3 space-y-1" dir="auto" {...props} />,
+                          li: ({node, ...props}: any) => <li className="leading-[1.6]" dir="auto" {...props} />,
+                          blockquote: ({node, ...props}: any) => <blockquote className="border-l-[3px] border-primary/50 pl-3 italic text-white/70 mb-3 bg-white/[0.02] py-1 rounded-r-md" dir="auto" {...props} />,
+                          hr: ({node, ...props}: any) => <hr className="my-4 border-white/10" {...props} />,
+                          table: ({node, ...props}: any) => <div className="overflow-x-auto mb-3"><table className="w-full text-left border-collapse text-[13px]" {...props} /></div>,
+                          th: ({node, ...props}: any) => <th className="border border-white/20 px-3 py-2 bg-white/5 font-semibold text-white" {...props} />,
+                          td: ({node, ...props}: any) => <td className="border border-white/10 px-3 py-2" {...props} />,
                           code: ({node, inline, className, children, ...props}: any) => {
                             const match = /language-(\w+)/.exec(className || '')
                             return !inline ? (
-                              <div className="rounded-md bg-black/40 border border-white/10 overflow-hidden my-3">
+                              <div className="rounded-md bg-[#0d0d0d] border border-white/10 overflow-hidden my-3 shadow-sm">
                                 {match && (
                                   <div className="flex justify-between items-center px-3 py-1.5 bg-black/60 border-b border-white/10">
-                                    <span className="text-[10px] text-white/50 font-mono">{match[1]}</span>
+                                    <span className="text-[10px] text-white/50 font-mono uppercase tracking-wider">{match[1]}</span>
                                     {match[1] === 'json' && (
                                       <button 
                                         onClick={() => handleApplyCodeBlock(String(children))}
-                                        className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded hover:bg-primary/30 transition-colors cursor-pointer"
+                                        className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded hover:bg-primary/30 transition-colors cursor-pointer font-medium"
                                       >
                                         Apply Changes
                                       </button>
                                     )}
                                   </div>
                                 )}
-                                <pre className="p-3 overflow-x-auto text-[12px] font-mono leading-normal" dir="ltr">
+                                <pre className="p-3 overflow-x-auto text-[12px] font-mono leading-relaxed text-white/80" dir="ltr">
                                   <code className={className} {...props}>
                                     {children}
                                   </code>
                                 </pre>
                               </div>
                             ) : (
-                              <code className="bg-black/30 rounded px-1.5 py-0.5 text-[12px] font-mono text-primary/80" dir="ltr" {...props}>
+                              <code className="bg-white/10 rounded px-1.5 py-0.5 text-[12px] font-mono text-primary/90" dir="ltr" {...props}>
                                 {children}
                               </code>
                             )
                           },
-                          a: ({node, ...props}) => <a className="text-primary hover:underline" {...props} />,
-                          strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />
+                          a: ({node, ...props}: any) => <a className="text-primary hover:underline hover:text-primary/80 transition-colors font-medium" {...props} />,
+                          strong: ({node, ...props}: any) => <strong className="font-semibold text-white" {...props} />
                         }}
                       />
                     )}
